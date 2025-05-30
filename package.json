@@ -1,0 +1,27 @@
+{
+  "name": "shaping-lab",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && cp dist/*.js public/",
+    "dev": "npm run build && http-server public -p 3000 -o",
+    "start": "http-server public -p 3000 -o",
+    "watch": "tsc --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^22.15.28",
+    "@types/p5": "^1.7.6",
+    "http-server": "^14.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "p5": "^2.0.3"
+  }
+}
