@@ -13,7 +13,19 @@
         <h1>Interactive Agent Environment</h1>
         <div id="canvas-container"></div>
         <div class="controls">
-            <button id="reward-btn" class="reward-button">🎉 Reward Agent</button>
+            <div class="button-group">
+                <button id="reward-btn" class="reward-button">🎉 Reward Agent</button>
+                <button id="punish-btn" class="punish-button" style="display: none;">❌ Punish Agent</button>
+            </div>
+            
+            <div class="punishment-toggle">
+                <label class="switch">
+                    <input type="checkbox" id="punishment-toggle">
+                    <span class="slider"></span>
+                </label>
+                <span class="toggle-label">Enable Punishment Mode</span>
+            </div>
+            
             <a href="pretrain.html" class="pretrain-link">🧠 Neural Network Pretraining</a>
             <div id="status" class="status">Agent is learning...</div>
             <div class="instructions">
@@ -22,7 +34,8 @@
                     <li>Optional: Use the <strong>Pretraining</strong> page to give the agent basic object knowledge</li>
                     <li>Watch the red agent move around using its neural network</li>
                     <li>Click "Reward Agent" when you like its behavior (e.g., when near objects)</li>
-                    <li>The agent learns ONLY from your manual rewards - no automatic training</li>
+                    <li>Toggle "Enable Punishment Mode" to show the punish button for negative feedback</li>
+                    <li>The agent learns ONLY from your manual rewards and punishments - no automatic training</li>
                     <li>Training happens immediately when you reward the agent</li>
                     <li>Check the console (F12) for detailed learning logs</li>
                 </ol>

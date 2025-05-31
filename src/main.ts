@@ -18,7 +18,16 @@ export class Environment {
         this.neuralNetwork = new NeuralNetwork();
         this.setupCanvas();
         this.createObjects();
-        this.setupRewardButton();
+        
+        // Setup controls when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.setupControlButtons();
+            });
+        } else {
+            // DOM is already loaded
+            this.setupControlButtons();
+        }
     }
 
     private setupCanvas(): void {
@@ -49,10 +58,39 @@ export class Environment {
         // Note: Neural network starts with no pretraining - it learns only from manual rewards
     }
 
-    private setupRewardButton(): void {
+    private setupControlButtons(): void {
+        console.log('Setting up control buttons...');
         const rewardButton = document.getElementById('reward-btn');
+        const punishButton = document.getElementById('punish-btn');
+        const punishmentToggle = document.getElementById('punishment-toggle') as HTMLInputElement;
         const statusDiv = document.getElementById('status');
         
+        console.log('Elements found:', {
+            rewardButton: !!rewardButton,
+            punishButton: !!punishButton,
+            punishmentToggle: !!punishmentToggle,
+            statusDiv: !!statusDiv
+        });
+        
+        // Handle punishment mode toggle
+        if (punishmentToggle && punishButton) {
+            console.log('Setting up punishment toggle event listener');
+            punishmentToggle.addEventListener('change', () => {
+                console.log('Punishment toggle changed:', punishmentToggle.checked);
+                if (punishmentToggle.checked) {
+                    punishButton.style.display = 'inline-block';
+                } else {
+                    punishButton.style.display = 'none';
+                }
+            });
+        } else {
+            console.error('Missing elements for punishment toggle:', {
+                punishmentToggle: !!punishmentToggle,
+                punishButton: !!punishButton
+            });
+        }
+        
+        // Handle reward button
         if (rewardButton && statusDiv) {
             rewardButton.addEventListener('click', () => {
                 // Reward the agent
@@ -69,6 +107,32 @@ export class Environment {
                 // Update status display
                 statusDiv.textContent = `Agent rewarded! Training data: ${stats.dataSize} examples`;
                 statusDiv.className = 'status rewarded';
+                
+                // Reset status after 2 seconds
+                setTimeout(() => {
+                    statusDiv.textContent = 'Agent is learning...';
+                    statusDiv.className = 'status';
+                }, 2000);
+            });
+        }
+        
+        // Handle punish button
+        if (punishButton && statusDiv) {
+            punishButton.addEventListener('click', () => {
+                // Punish the agent
+                this.agent.punish();
+                
+                // Log punishment event with neural network stats
+                const stats = this.agent.getNeuralNetworkStats();
+                console.log('❌ PUNISHMENT EVENT ❌');
+                console.log('Agent State:', this.agent.getCurrentState().map(x => x.toFixed(3)));
+                console.log('Agent Action:', this.agent.getLastAction().map(x => x.toFixed(3)));
+                console.log('Training Data Size:', stats.dataSize);
+                console.log('Is Training:', stats.isTraining);
+                
+                // Update status display
+                statusDiv.textContent = `Agent punished! Training data: ${stats.dataSize} examples`;
+                statusDiv.className = 'status punished';
                 
                 // Reset status after 2 seconds
                 setTimeout(() => {
