@@ -7,70 +7,251 @@ export interface TrainingExample {
     timestamp: number;
 }
 
+export interface MemoryEntry {
+    state: number[];
+    action: number[];
+    timestamp: number;
+}
+
 export class NeuralNetwork {
-    private model: any; // TensorFlow.js model
+    private model: any; // TensorFlow.js model - ACTIVE model used for predictions
+    private trainingModel: any; // TensorFlow.js model - TRAINING model (copy for background training)
     private trainingData: TrainingExample[];
     private isTraining: boolean;
     private lastTrainingTime: number;
+    private isReady: boolean; // Whether the network is ready for use (after pretraining)
+    
+    // TEMPORAL MEMORY SYSTEM for automatic reward/punishment
+    private temporalMemory: MemoryEntry[]; // Buffer of recent actions
+    private lastRewardTime: number; // When the last manual reward was given
+    private rewardTimeoutDuration: number; // 10 seconds timeout
+    private memoryCheckInterval: number; // How often to check for timeouts
+    private lastMemoryCheck: number; // Last time we checked memory
+    
+    // NON-BLOCKING TRAINING SYSTEM
+    private trainingQueued: boolean; // Whether training is queued for next idle moment
+    private trainingTimeout: any; // Timeout ID for scheduled training
+    private clearDataAfterTraining: boolean; // Whether to clear training data after next training session
+    
+    // DATA RATE LIMITING - 10 entries per second
+    private lastDataRecordTime: number; // Last time data was recorded
+    private dataRecordInterval: number; // Minimum interval between data records (100ms for 10/sec)
+    private dataCountCurrentSecond: number; // Count of data recorded in current second
+    private lastSecondReset: number; // Last time the second counter was reset
 
     constructor() {
         this.trainingData = [];
         this.isTraining = false;
         this.lastTrainingTime = 0;
+        this.isReady = false; // Start as not ready until pretraining is complete
+        
+        // Initialize temporal memory system for automatic reward/punishment
+        this.temporalMemory = [];
+        this.lastRewardTime = Date.now();
+        this.rewardTimeoutDuration = 10000; // 10 seconds
+        this.memoryCheckInterval = 1000; // Check every 1 second (less frequent)
+        this.lastMemoryCheck = Date.now();
+        
+        // Initialize non-blocking training system
+        this.trainingQueued = false;
+        this.trainingTimeout = null;
+        this.clearDataAfterTraining = false;
+        
+        // Initialize training model as null (will be created when needed)
+        this.trainingModel = null;
+        
+        // Initialize data rate limiting (5 entries per second for even better performance)
+        this.lastDataRecordTime = 0;
+        this.dataRecordInterval = 200; // 200ms = 5 entries per second max (reduced from 10)
+        this.dataCountCurrentSecond = 0;
+        this.lastSecondReset = Date.now();
+        
         this.initializeModel();
     }
 
     /**
-     * Initialize the neural network model
-     * Enhanced input: [x, y, velocity_x, velocity_y, 
-     *                  circle_dist, circle_rel_x, circle_rel_y, circle_approach,
-     *                  square_dist, square_rel_x, square_rel_y, square_approach,
-     *                  diamond_dist, diamond_rel_x, diamond_rel_y, diamond_approach,
-     *                  nearest_wall_dist, wall_direction_x, wall_direction_y] (19 features)
+     * Initialize the neural network model - PURE INTELLIGENCE ARCHITECTURE
+     * Advanced deep learning system for autonomous agent behavior
+     * Input: [x, y, velocity_x, velocity_y, 
+     *         circle_dist, circle_rel_x, circle_rel_y, circle_approach,
+     *         square_dist, square_rel_x, square_rel_y, square_approach,
+     *         diamond_dist, diamond_rel_x, diamond_rel_y, diamond_approach,
+     *         nearest_wall_dist, wall_direction_x, wall_direction_y] (19 features)
      * Output: [deltaX, deltaY] (2 outputs for movement direction)
      */
     private initializeModel(): void {
-        // Create a more sophisticated neural network for object awareness
+        // Create an advanced neural network for autonomous intelligent behavior
         this.model = (window as any).tf.sequential({
             layers: [
-                // Input layer: 19 features (enhanced spatial awareness)
+                // Input layer: 19 features (comprehensive spatial awareness)
                 (window as any).tf.layers.dense({
                     inputShape: [19],
-                    units: 48,
+                    units: 96, // Increased capacity for more complex learning
                     activation: 'relu',
-                    name: 'hidden1'
+                    kernelInitializer: 'heNormal',
+                    useBias: true,
+                    name: 'spatial_intelligence'
                 }),
-                // Hidden layer 1 - for object detection and spatial reasoning
+                // Enhanced dropout for robustness
+                (window as any).tf.layers.dropout({
+                    rate: 0.15
+                }),
+                // Hidden layer 1 - Deep spatial reasoning
+                (window as any).tf.layers.dense({
+                    units: 72,
+                    activation: 'relu',
+                    kernelInitializer: 'heNormal',
+                    name: 'deep_spatial_analysis'
+                }),
+                // Hidden layer 2 - Object relationship understanding
+                (window as any).tf.layers.dense({
+                    units: 48,
+                    activation: 'relu', 
+                    kernelInitializer: 'heNormal',
+                    name: 'object_relationship'
+                }),
+                // Dropout for pattern generalization
+                (window as any).tf.layers.dropout({
+                    rate: 0.1
+                }),
+                // Hidden layer 3 - Behavioral intelligence
                 (window as any).tf.layers.dense({
                     units: 32,
                     activation: 'relu',
-                    name: 'hidden2'
+                    kernelInitializer: 'heNormal',
+                    name: 'behavioral_intelligence'
                 }),
-                // Hidden layer 2 - for movement planning
+                // Hidden layer 4 - Movement planning
                 (window as any).tf.layers.dense({
                     units: 16,
                     activation: 'relu',
-                    name: 'hidden3'
+                    kernelInitializer: 'heNormal',
+                    name: 'movement_planning'
                 }),
-                // Output layer: 2 outputs (deltaX, deltaY)
+                // Output layer: Pure neural movement control
                 (window as any).tf.layers.dense({
                     units: 2,
-                    activation: 'tanh', // tanh gives values between -1 and 1
-                    name: 'output'
+                    activation: 'tanh', // Normalized output [-1, 1]
+                    kernelInitializer: 'glorotNormal',
+                    name: 'autonomous_movement'
                 })
             ]
         });
 
-        // Compile the model with a conservative optimizer
+        // Advanced optimizer for sophisticated learning
         this.model.compile({
-            optimizer: (window as any).tf.train.adam(0.001), // Reduced learning rate from 0.003 to 0.001
+            optimizer: (window as any).tf.train.adam(0.003), // Higher learning rate for autonomous intelligence
             loss: 'meanSquaredError',
             metrics: ['mse']
         });
 
-        console.log('Enhanced neural network initialized with intelligent object detection');
-        console.log('Model summary:');
+        console.log('🧠 PURE INTELLIGENCE NEURAL NETWORK INITIALIZED');
+        console.log('🚀 Architecture: 96→72→48→32→16→2 neurons with advanced autonomous learning');
+        console.log('✨ The agent will develop natural curiosity and intelligence through pure neural learning');
         this.model.summary();
+    }
+
+    /**
+     * Create a copy of the current model for background training
+     * This enables double-buffering: train on copy, swap when done
+     */
+    private async createModelCopy(): Promise<any> {
+        try {
+            // Create a new model with the same architecture as the original
+            const tf = (window as any).tf;
+            const newModel = tf.sequential({
+                layers: [
+                    // Input layer: 19 features (comprehensive spatial awareness)
+                    tf.layers.dense({
+                        inputShape: [19],
+                        units: 96, // Increased capacity for more complex learning
+                        activation: 'relu',
+                        kernelInitializer: 'heNormal',
+                        useBias: true,
+                        name: 'spatial_intelligence'
+                    }),
+                    // Enhanced dropout for robustness
+                    tf.layers.dropout({
+                        rate: 0.15
+                    }),
+                    // Hidden layer 1 - Deep spatial reasoning
+                    tf.layers.dense({
+                        units: 72,
+                        activation: 'relu',
+                        kernelInitializer: 'heNormal',
+                        name: 'deep_spatial_analysis'
+                    }),
+                    // Hidden layer 2 - Object relationship understanding
+                    tf.layers.dense({
+                        units: 48,
+                        activation: 'relu', 
+                        kernelInitializer: 'heNormal',
+                        name: 'object_relationship'
+                    }),
+                    // Dropout for pattern generalization
+                    tf.layers.dropout({
+                        rate: 0.1
+                    }),
+                    // Hidden layer 3 - Behavioral intelligence
+                    tf.layers.dense({
+                        units: 32,
+                        activation: 'relu',
+                        kernelInitializer: 'heNormal',
+                        name: 'behavioral_intelligence'
+                    }),
+                    // Hidden layer 4 - Movement planning
+                    tf.layers.dense({
+                        units: 16,
+                        activation: 'relu',
+                        kernelInitializer: 'heNormal',
+                        name: 'movement_planning'
+                    }),
+                    // Output layer: Pure neural movement control
+                    tf.layers.dense({
+                        units: 2,
+                        activation: 'tanh', // Normalized output [-1, 1]
+                        kernelInitializer: 'glorotNormal',
+                        name: 'autonomous_movement'
+                    })
+                ]
+            });
+
+            // Compile the new model with the same configuration
+            newModel.compile({
+                optimizer: tf.train.adam(0.003),
+                loss: 'meanSquaredError',
+                metrics: ['mse']
+            });
+
+            // Copy weights from the current model to the new model
+            const currentWeights = this.model.getWeights();
+            newModel.setWeights(currentWeights);
+            
+            // Clean up the temporary weight tensors
+            currentWeights.forEach((w: any) => w.dispose());
+            
+            return newModel;
+        } catch (error) {
+            console.error('❌ Failed to create model copy:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Atomically swap the training model with the active model
+     * This ensures smooth transitions without rendering interruption
+     */
+    private swapModels(): void {
+        if (this.trainingModel) {
+            // Dispose of the old active model to free memory
+            this.model.dispose();
+            
+            // Atomically switch to the newly trained model
+            this.model = this.trainingModel;
+            this.trainingModel = null;
+            
+            console.log('🔄 Model swap completed - new training applied!');
+        }
     }
 
     /**
@@ -148,7 +329,8 @@ export class NeuralNetwork {
     }
 
     /**
-     * Predict the next movement direction using object-focused neural network
+     * Predict the next movement direction using PURE NEURAL NETWORK INTELLIGENCE
+     * NO ARTIFICIAL ASSISTANCE - Complete autonomous control
      */
     public async predict(state: number[]): Promise<{dx: number, dy: number}> {
         const inputTensor = (window as any).tf.tensor2d([state], [1, 19]);
@@ -159,68 +341,17 @@ export class NeuralNetwork {
         inputTensor.dispose();
         prediction.dispose();
 
-        // OBJECT-FOCUSED MOVEMENT LOGIC
-        // Get object distances and directions
-        const circleDistance = state[4];
-        const circleDirX = state[5];
-        const circleDirY = state[6];
+        // PURE NEURAL NETWORK OUTPUT - No artificial scaling or biases
+        // The network learns to output appropriate movement values through training
+        const autonomousMovementScale = 4.5; // Sufficient range for effective movement
         
-        const squareDistance = state[8];
-        const squareDirX = state[9];
-        const squareDirY = state[10];
+        const neuralDx = output[0] * autonomousMovementScale;
+        const neuralDy = output[1] * autonomousMovementScale;
         
-        const diamondDistance = state[12];
-        const diamondDirX = state[13];
-        const diamondDirY = state[14];
-        
-        // Find the nearest object
-        const objects = [
-            { distance: circleDistance, dirX: circleDirX, dirY: circleDirY },
-            { distance: squareDistance, dirX: squareDirX, dirY: squareDirY },
-            { distance: diamondDistance, dirX: diamondDirX, dirY: diamondDirY }
-        ];
-        
-        const nearestObject = objects.reduce((nearest, current) => 
-            current.distance < nearest.distance ? current : nearest
-        );
-        
-        // STRONG OBJECT ATTRACTION - Override neural network when far from objects
-        let finalDx = output[0];
-        let finalDy = output[1];
-        
-        const objectAttractionStrength = 0.6; // Strong attraction to nearest object
-        const baseMovementScale = 1.5;
-        
-        // If we're far from all objects, move toward the nearest one
-        if (nearestObject.distance > 0.4) {
-            // Override neural network with object-seeking behavior
-            finalDx = finalDx * 0.3 + nearestObject.dirX * objectAttractionStrength;
-            finalDy = finalDy * 0.3 + nearestObject.dirY * objectAttractionStrength;
-            console.log('🎯 Seeking nearest object');
-        } else {
-            // Close to objects, let neural network decide with gentle object bias
-            finalDx = finalDx + nearestObject.dirX * 0.2;
-            finalDy = finalDy + nearestObject.dirY * 0.2;
-        }
-        
-        // Apply base scaling
-        finalDx *= baseMovementScale;
-        finalDy *= baseMovementScale;
-        
-        // WALL AVOIDANCE (secondary concern)
-        const wallDist = state[16];
-        if (wallDist < 0.2) {
-            const centerX = state[17];
-            const centerY = state[18];
-            const wallAvoidanceStrength = (0.2 - wallDist) / 0.2;
-            
-            finalDx += centerX * wallAvoidanceStrength * 0.5;
-            finalDy += centerY * wallAvoidanceStrength * 0.5;
-        }
-        
+        // Only basic physics constraints to prevent simulation breaking
         return {
-            dx: Math.max(-2.5, Math.min(2.5, finalDx)),
-            dy: Math.max(-2.5, Math.min(2.5, finalDy))
+            dx: Math.max(-5.0, Math.min(5.0, neuralDx)),
+            dy: Math.max(-5.0, Math.min(5.0, neuralDy))
         };
     }
 
@@ -240,17 +371,17 @@ export class NeuralNetwork {
         
         // Increase reward when close to objects!
         if (nearestObjectDist < 0.3) {
-            adjustedReward = 2.0; // Double reward for being near objects
+            adjustedReward = 2.0; 
             console.log(`🎯 BONUS reward for object proximity! Distance: ${(nearestObjectDist * 100).toFixed(1)}%`);
         } else if (nearestObjectDist < 0.5) {
-            adjustedReward = 1.5; // 50% bonus for moderate object proximity
+            adjustedReward = 1.5;
             console.log(`🎯 Bonus reward for object proximity! Distance: ${(nearestObjectDist * 100).toFixed(1)}%`);
         }
         
         // Only reduce reward if agent is both far from objects AND near walls
         const wallDistance = state[16];
         if (nearestObjectDist > 0.7 && wallDistance < 0.2) {
-            adjustedReward = 0.5; // Reduce reward only when ignoring objects AND near walls
+            adjustedReward = 0; // Reduce reward only when ignoring objects AND near walls
             console.log(`⚠️ Reduced reward: far from objects (${(nearestObjectDist * 100).toFixed(1)}%) and near walls`);
         }
 
@@ -318,165 +449,602 @@ export class NeuralNetwork {
     }
 
     /**
-     * Record a punishment for negative reinforcement learning
+     * Schedule training with current data, then clear it afterwards
+     * This ensures training data resets to 0 after each manual intervention
      */
-    public recordPunishment(state: number[], action: number[]): void {
-        const example: TrainingExample = {
-            state: [...state],
-            action: [...action],
-            reward: -1.0, // Negative reward for punishment
-            timestamp: Date.now()
-        };
-
-        this.trainingData.push(example);
-        console.log(`Punishment recorded! Training data size: ${this.trainingData.length}`);
-        console.log('State:', state.map(x => x.toFixed(3)));
-        console.log('Action:', action.map(x => x.toFixed(3)));
-
-        // Limit training data size to prevent memory issues
-        if (this.trainingData.length > 1000) {
-            this.trainingData = this.trainingData.slice(-500); // Keep most recent 500 examples
+    private clearTrainingDataAfterReward(): void {
+        const currentDataSize = this.trainingData.length;
+        
+        if (currentDataSize >= 3) {
+            console.log(`🔄 Will train with ${currentDataSize} examples, then clear data...`);
+            // Set flag to clear data after training completes
+            this.clearDataAfterTraining = true;
+        } else {
+            // Not enough data to train, just clear immediately
+            this.trainingData = [];
+            console.log(`🧹 Training data cleared! Reset to 0 examples (insufficient data for training)`);
         }
     }
 
     /**
-     * Trigger training immediately for manual rewards/punishments
+     * NON-BLOCKING TRAINING SYSTEM
+     * Queue training to run asynchronously without blocking the rendering loop
      */
-    public async maybeTrainModel(): Promise<void> {
-        if (this.trainingData.length >= 5 && !this.isTraining) {
-            await this.trainModel();
+    
+    /**
+     * Schedule training to run in the background without blocking the UI
+     * Uses requestIdleCallback if available, otherwise setTimeout
+     */
+    private scheduleNonBlockingTraining(): void {
+        // Don't queue if already queued or currently training
+        if (this.trainingQueued || this.isTraining) {
+            return;
+        }
+        
+        this.trainingQueued = true;
+        
+        // Clear any existing timeout
+        if (this.trainingTimeout !== null) {
+            clearTimeout(this.trainingTimeout);
+        }
+        
+        // Use requestIdleCallback for better performance if available
+        if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(() => {
+                this.executeNonBlockingTraining();
+            }, { timeout: 2000 }); // Fallback to timeout after 2 seconds
+        } else {
+            // Fallback to setTimeout with a longer delay to reduce training frequency
+            this.trainingTimeout = setTimeout(() => {
+                this.executeNonBlockingTraining();
+            }, 300); // Increased delay to reduce frequency
         }
     }
-
+    
     /**
-     * Train the neural network on collected reward data
+     * Execute training in a non-blocking way using async chunks
      */
-    private async trainModel(): Promise<void> {
-        if (this.trainingData.length < 5 || this.isTraining) {
+    private async executeNonBlockingTraining(): Promise<void> {
+        this.trainingQueued = false;
+        this.trainingTimeout = null;
+        
+        // Don't train if conditions aren't met or if trained recently
+        const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
+        if (this.trainingData.length < 10 || this.isTraining || timeSinceLastTraining < 2000) {
+            return;
+        }
+        
+        try {
+            // Split training into smaller chunks to prevent blocking
+            await this.trainModelNonBlocking();
+        } catch (error) {
+            console.error('Non-blocking training failed:', error);
+        }
+    }
+    
+    /**
+     * Train the model using double-buffering to prevent animation lag
+     * Creates a copy of the model, trains it in background, then swaps atomically
+     */
+    private async trainModelNonBlocking(): Promise<void> {
+        const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
+        if (this.trainingData.length < 10 || this.isTraining || timeSinceLastTraining < 2000) {
             return;
         }
 
         this.isTraining = true;
         this.lastTrainingTime = Date.now();
 
-        console.log(`Training neural network with ${this.trainingData.length} examples...`);
+        console.log(`🧠 Double-buffered training started with ${this.trainingData.length} examples...`);
 
         try {
-            // Prepare training data
-            const states = this.trainingData.map(example => example.state);
-            const actions = this.trainingData.map(example => example.action);
+            // STEP 1: Create a copy of the current model for background training
+            this.trainingModel = await this.createModelCopy();
+            console.log('📋 Model copy created for background training');
 
-            // Convert to tensors
-            const inputTensor = (window as any).tf.tensor2d(states);
-            const outputTensor = (window as any).tf.tensor2d(actions);
+            // STEP 2: Prepare training data (use only a subset for faster training)
+            const maxSamples = Math.min(50, this.trainingData.length); // Limit samples for speed
+            const sampleData = this.trainingData.slice(-maxSamples); // Use most recent data
+            
+            const inputData: number[][] = [];
+            const outputData: number[][] = [];
 
-            // Train the model
-            const history = await this.model.fit(inputTensor, outputTensor, {
-                epochs: 10,
-                batchSize: Math.min(32, this.trainingData.length),
-                verbose: 0,
-                validationSplit: 0.1
+            sampleData.forEach(example => {
+                inputData.push([...example.state]);
+                outputData.push([...example.action]);
             });
 
-            const finalLoss = history.history.loss[history.history.loss.length - 1];
-            console.log(`Training completed. Final loss: ${finalLoss.toFixed(4)}`);
+            const inputTensor = (window as any).tf.tensor2d(inputData);
+            const outputTensor = (window as any).tf.tensor2d(outputData);
 
-            // Clean up tensors
+            // STEP 3: Train the COPY model (not the active one!)
+            // The active model continues to be used for predictions without interruption
+            const history = await this.trainingModel.fit(inputTensor, outputTensor, {
+                epochs: 2, // Reduced from 5 for even faster training
+                batchSize: Math.min(32, Math.max(8, Math.floor(sampleData.length / 2))), // Larger batches
+                shuffle: true,
+                verbose: 0, // No console output for performance
+                validationSplit: 0,
+                callbacks: {
+                    onEpochEnd: async (_epoch: number, _logs: any) => {
+                        // Yield control back to browser after each epoch
+                        await new Promise(resolve => setTimeout(resolve, 5));
+                    }
+                }
+            });
+
+            // STEP 4: Clean up tensors immediately
             inputTensor.dispose();
             outputTensor.dispose();
 
+            // STEP 5: Atomically swap the trained model with the active model
+            // This is a single, fast operation that doesn't interrupt rendering
+            this.swapModels();
+
+            const finalLoss = history.history.loss[history.history.loss.length - 1];
+            console.log(`⚡ Double-buffered training completed! Loss: ${finalLoss.toFixed(4)}`);
+
         } catch (error) {
-            console.error('Training failed:', error);
+            console.error('Double-buffered training failed:', error);
+            // Clean up training model if something went wrong
+            if (this.trainingModel) {
+                this.trainingModel.dispose();
+                this.trainingModel = null;
+            }
         } finally {
             this.isTraining = false;
+            
+            // Clear training data if requested after manual reward/punishment
+            if (this.clearDataAfterTraining) {
+                this.trainingData = [];
+                this.clearDataAfterTraining = false;
+                console.log(`🧹 Training data cleared! Reset to 0 examples after manual reward/punishment`);
+            }
         }
     }
 
     /**
-     * Get current training statistics
+     * Check if the neural network is ready for use (after pretraining)
      */
-    public getStats(): {dataSize: number, isTraining: boolean, lastTraining: number} {
+    public isNetworkReady(): boolean {
+        return this.isReady;
+    }
+
+    /**
+     * Mark the network as ready after pretraining
+     */
+    public markAsReady(): void {
+        this.isReady = true;
+        console.log('✅ Neural network marked as ready!');
+    }
+
+    /**
+     * Force training with current data (used during pretraining)
+     */
+    public async forceTraining(): Promise<void> {
+        if (this.trainingData.length < 10) {
+            console.log('⚠️ Not enough training data for forced training');
+            return;
+        }
+
+        console.log(`🚀 Force training with ${this.trainingData.length} examples...`);
+        await this.trainModelNonBlocking();
+    }
+
+    /**
+     * Pretrain the network to be interested in objects
+     * This gives the agent a head start before manual training begins
+     */
+    public async pretrainObjectInterest(canvasWidth: number, canvasHeight: number, staticObjects: any[]): Promise<void> {
+        console.log('🎯 Generating object-interest training data...');
+        
+        // Generate 200 positive examples where agent moves toward objects
+        for (let i = 0; i < 200; i++) {
+            // Random agent position
+            const agentX = Math.random() * canvasWidth;
+            const agentY = Math.random() * canvasHeight;
+            
+            // Pick random target object
+            const targetObject = staticObjects[Math.floor(Math.random() * staticObjects.length)];
+            const targetX = targetObject.position.x;
+            const targetY = targetObject.position.y;
+            
+            // Calculate direction towards object
+            const dx = targetX - agentX;
+            const dy = targetY - agentY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Normalize direction (this becomes the "good" action)
+            const actionX = (dx / distance) * 0.7; // Moderate speed
+            const actionY = (dy / distance) * 0.7;
+            
+            // Create state vector (19 features)
+            const state = this.createSyntheticState(agentX, agentY, staticObjects, canvasWidth, canvasHeight);
+            
+            // Higher reward when closer to objects
+            const normalizedDistance = Math.min(distance / 200, 1.0);
+            const reward = 0.8 - (normalizedDistance * 0.6); // Range: 0.2 to 0.8
+            
+            // Add directly to training data
+            this.trainingData.push({
+                state: state,
+                action: [actionX, actionY],
+                reward: reward,
+                timestamp: Date.now()
+            });
+        }
+
+        // Generate 80 negative examples where agent moves away from objects
+        for (let i = 0; i < 80; i++) {
+            // Random agent position, but closer to objects for contrast
+            const targetObject = staticObjects[Math.floor(Math.random() * staticObjects.length)];
+            const agentX = targetObject.position.x + (Math.random() - 0.5) * 150;
+            const agentY = targetObject.position.y + (Math.random() - 0.5) * 150;
+            
+            // Calculate direction AWAY from object
+            const dx = agentX - targetObject.position.x;
+            const dy = agentY - targetObject.position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Normalize away direction (this becomes the "bad" action)
+            const actionX = (dx / distance) * 0.8;
+            const actionY = (dy / distance) * 0.8;
+            
+            // Create state vector
+            const state = this.createSyntheticState(agentX, agentY, staticObjects, canvasWidth, canvasHeight);
+            
+            // Add directly to training data
+            this.trainingData.push({
+                state: state,
+                action: [actionX, actionY],
+                reward: -0.3,
+                timestamp: Date.now()
+            });
+        }
+
+        console.log(`📊 Generated ${this.trainingData.length} pretraining examples`);
+        
+        // Train the network with this data
+        await this.forceTraining();
+        
+        console.log('✅ Object interest pretraining completed!');
+    }
+
+    /**
+     * Create a synthetic state vector for pretraining
+     */
+    private createSyntheticState(agentX: number, agentY: number, objects: any[], canvasWidth: number, canvasHeight: number): number[] {
+        const state = [];
+        
+        // Agent position (normalized)
+        state.push(agentX / canvasWidth);
+        state.push(agentY / canvasHeight);
+        
+        // Distance to each object (3 objects)
+        objects.forEach(obj => {
+            const dx = obj.position.x - agentX;
+            const dy = obj.position.y - agentY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            state.push(Math.min(distance / 200, 1.0)); // Normalized distance
+        });
+        
+        // Direction to each object (6 values: dx, dy for each)
+        objects.forEach(obj => {
+            const dx = obj.position.x - agentX;
+            const dy = obj.position.y - agentY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            state.push(dx / distance); // Normalized direction x
+            state.push(dy / distance); // Normalized direction y
+        });
+        
+        // Distance to walls (4 walls)
+        state.push(agentX / canvasWidth); // Left wall
+        state.push((canvasWidth - agentX) / canvasWidth); // Right wall  
+        state.push(agentY / canvasHeight); // Top wall
+        state.push((canvasHeight - agentY) / canvasHeight); // Bottom wall
+        
+        // Agent velocity (simulated as small random values)
+        state.push((Math.random() - 0.5) * 0.2);
+        state.push((Math.random() - 0.5) * 0.2);
+        
+        // Previous action (simulated as small random values)
+        state.push((Math.random() - 0.5) * 0.4);
+        state.push((Math.random() - 0.5) * 0.4);
+        
+        return state;
+    }
+
+    /**
+     * Get training statistics for monitoring
+     */
+    public getStats(): { dataSize: number, isTraining: boolean, lastTraining: number, isReady: boolean } {
         return {
             dataSize: this.trainingData.length,
             isTraining: this.isTraining,
-            lastTraining: this.lastTrainingTime
+            lastTraining: this.lastTrainingTime,
+            isReady: this.isReady
         };
     }
 
     /**
-     * Pretrain the neural network to be interested in objects
-     * Generates positive training examples for moving toward objects
+     * TEMPORAL MEMORY SYSTEM - Automatic reward/punishment based on timing
+     * Records actions for automatic feedback when manual rewards are delayed
      */
-    public pretrainObjectInterest(canvasWidth: number, canvasHeight: number, 
-                                 objects: Array<{position: Position, getSize?: () => number}>): void {
-        console.log('🎯 Pretraining neural network to be interested in objects...');
+    
+    /**
+     * Record an action to temporal memory for potential automatic feedback
+     * Rate limited to 10 entries per second for better performance
+     * @param state Current state vector
+     * @param action Action taken [deltaX, deltaY]
+     */
+    recordAction(state: number[], action: number[]): void {
+        const now = Date.now();
         
-        const pretrainingExamples: TrainingExample[] = [];
-        const numExamples = 200; // Reduced to a reasonable number for quality over quantity
-        
-        for (let i = 0; i < numExamples; i++) {
-            // Random agent position (favoring center area, not edges)
-            const marginPercent = 0.25; // Keep agent in center 50% of canvas
-            const centerMarginX = canvasWidth * marginPercent;
-            const centerMarginY = canvasHeight * marginPercent;
-            
-            const agentX = centerMarginX + Math.random() * (canvasWidth - 2 * centerMarginX);
-            const agentY = centerMarginY + Math.random() * (canvasHeight - 2 * centerMarginY);
-            
-            // Zero or small random velocity
-            const velX = (Math.random() - 0.5) * 2; // Smaller velocity range
-            const velY = (Math.random() - 0.5) * 2;
-            
-            // Calculate state for this position
-            const state = this.calculateState(
-                { x: agentX, y: agentY },
-                canvasWidth,
-                canvasHeight,
-                objects,
-                { dx: velX, dy: velY }
-            );
-            
-            // Find nearest object and create action toward it
-            const circleDistance = state[4];
-            const squareDistance = state[8];
-            const diamondDistance = state[12];
-            
-            const objectInfo = [
-                { distance: circleDistance, dirX: state[5], dirY: state[6] },
-                { distance: squareDistance, dirX: state[9], dirY: state[10] },
-                { distance: diamondDistance, dirX: state[13], dirY: state[14] }
-            ];
-            
-            const nearestObject = objectInfo.reduce((nearest, current) => 
-                current.distance < nearest.distance ? current : nearest
-            );
-            
-            // Create action that moves toward nearest object
-            const objectSeekingAction = [
-                nearestObject.dirX * 1.5, // Move toward object
-                nearestObject.dirY * 1.5
-            ];
-            
-            // Higher reward for being closer to objects
-            const proximityReward = 2.0 - nearestObject.distance; // Closer = higher reward
-            
-            const example: TrainingExample = {
-                state: [...state],
-                action: objectSeekingAction,
-                reward: Math.max(1.0, proximityReward), // At least 1.0 reward
-                timestamp: Date.now() - i // Vary timestamps
-            };
-            
-            pretrainingExamples.push(example);
+        // Reset counter every second
+        if (now - this.lastSecondReset >= 1000) {
+            this.dataCountCurrentSecond = 0;
+            this.lastSecondReset = now;
         }
         
-        // Add all pretraining examples to training data
-        this.trainingData = [...pretrainingExamples, ...this.trainingData];
+        // Rate limiting: Maximum 5 entries per second (reduced for better performance)
+        if (this.dataCountCurrentSecond >= 5) {
+            return; // Skip this recording to maintain rate limit
+        }
         
-        console.log(`✅ Added ${numExamples} object-focused pretraining examples`);
-        console.log(`📊 Total training data: ${this.trainingData.length} examples`);
+        // Additional time-based limiting to spread entries evenly
+        if (now - this.lastDataRecordTime < this.dataRecordInterval) {
+            return; // Skip this recording to maintain minimum interval
+        }
         
-        // Train immediately on this data
-        this.trainModel();
+        this.lastDataRecordTime = now;
+        this.dataCountCurrentSecond++;
+        
+        // Add to temporal memory buffer
+        this.temporalMemory.push({
+            state: [...state],
+            action: [...action],
+            timestamp: now
+        });
+        
+        // Optimize: Only clean up memory periodically, not on every action
+        if (this.temporalMemory.length > 50) { // Reduced buffer size for better performance
+            this.temporalMemory = this.temporalMemory.filter(
+                entry => now - entry.timestamp < 15000 // Keep 15 seconds worth
+            );
+        }
+        
+        // Check for timeout-based punishment less frequently
+        this.checkForTimeoutPunishment();
+    }
+    
+    /**
+     * Called when manual reward is given - converts buffered actions to positive examples
+     * Uses temporal weighting: more recent actions get higher rewards
+     * @param intensity Base reward intensity (0.1 to 1.0)
+     */
+    giveManualReward(intensity: number = 0.8): void {
+        const now = Date.now();
+        this.lastRewardTime = now;
+        
+        // Convert recent temporal memory entries to positive training examples with temporal weighting
+        const recentActions = this.temporalMemory.filter(
+            entry => now - entry.timestamp < this.rewardTimeoutDuration
+        );
+        
+        console.log(`🎉 Manual reward given! Converting ${recentActions.length} recent actions to temporally weighted positive examples`);
+        
+        recentActions.forEach(entry => {
+            // Calculate temporal weight: more recent actions get higher rewards
+            const actionAge = now - entry.timestamp;
+            const normalizedAge = actionAge / this.rewardTimeoutDuration; // 0 = most recent, 1 = oldest
+            const temporalWeight = 1.0 - normalizedAge; // 1.0 = most recent, 0.0 = oldest
+            
+            // Apply temporal weighting to reward intensity
+            const weightedReward = intensity * Math.max(0.1, temporalWeight); // Minimum 10% of base intensity
+            
+            const trainingExample: TrainingExample = {
+                state: [...entry.state],
+                action: [...entry.action],
+                reward: weightedReward,
+                timestamp: entry.timestamp
+            };
+            this.trainingData.push(trainingExample);
+            
+            console.log(`  Action ${actionAge}ms ago: weight=${temporalWeight.toFixed(2)}, reward=${weightedReward.toFixed(3)}`);
+        });
+        
+        // Clear the rewarded actions from temporal memory
+        this.temporalMemory = this.temporalMemory.filter(
+            entry => now - entry.timestamp >= this.rewardTimeoutDuration
+        );
+        
+        // Clear training data and trigger training immediately after reward
+        this.clearTrainingDataAfterReward();
+        
+        // Trigger non-blocking training if we have enough examples and enough time has passed
+        const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
+        if (this.trainingData.length >= 5 && timeSinceLastTraining > 2000) { // Lower threshold for immediate training
+            this.scheduleNonBlockingTraining();
+        }
+    }
+
+    /**
+     * Called when manual punishment is given - converts buffered actions to negative examples
+     * Uses temporal weighting: more recent actions get stronger punishments
+     * @param intensity Base punishment intensity (0.1 to 1.0)
+     */
+    giveManualPunishment(intensity: number = 0.6): void {
+        const now = Date.now();
+        this.lastRewardTime = now; // Update last reward time to reset timeout
+        
+        // Convert recent temporal memory entries to negative training examples with temporal weighting
+        const recentActions = this.temporalMemory.filter(
+            entry => now - entry.timestamp < this.rewardTimeoutDuration
+        );
+        
+        console.log(`🚫 Manual punishment given! Converting ${recentActions.length} recent actions to temporally weighted negative examples`);
+        
+        recentActions.forEach(entry => {
+            // Calculate temporal weight: more recent actions get stronger punishments
+            const actionAge = now - entry.timestamp;
+            const normalizedAge = actionAge / this.rewardTimeoutDuration; // 0 = most recent, 1 = oldest
+            const temporalWeight = 1.0 - normalizedAge; // 1.0 = most recent, 0.0 = oldest
+            
+            // Apply temporal weighting to punishment intensity (negative value)
+            const weightedPunishment = -intensity * Math.max(0.1, temporalWeight); // Minimum 10% of base intensity
+            
+            const trainingExample: TrainingExample = {
+                state: [...entry.state],
+                action: [...entry.action],
+                reward: weightedPunishment,
+                timestamp: entry.timestamp
+            };
+            this.trainingData.push(trainingExample);
+            
+            console.log(`  Action ${actionAge}ms ago: weight=${temporalWeight.toFixed(2)}, punishment=${weightedPunishment.toFixed(3)}`);
+        });
+        
+        // Clear the punished actions from temporal memory
+        this.temporalMemory = this.temporalMemory.filter(
+            entry => now - entry.timestamp >= this.rewardTimeoutDuration
+        );
+        
+        // Clear training data and trigger training immediately after punishment
+        this.clearTrainingDataAfterReward();
+        
+        // Trigger non-blocking training if we have enough examples and enough time has passed
+        const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
+        if (this.trainingData.length >= 5 && timeSinceLastTraining > 2000) { // Lower threshold for immediate training
+            this.scheduleNonBlockingTraining();
+        }
+    }
+    
+    /**
+     * Check for timeout-based automatic punishment
+     * Called periodically to assign negative rewards to old unrewarded actions
+     */
+    private checkForTimeoutPunishment(): void {
+        const now = Date.now();
+        
+        // Only check at intervals to avoid constant processing
+        if (now - this.lastMemoryCheck < this.memoryCheckInterval) {
+            return;
+        }
+        
+        this.lastMemoryCheck = now;
+        
+        // Find actions that are older than timeout and haven't been rewarded
+        const timeoutActions = this.temporalMemory.filter(
+            entry => now - entry.timestamp > this.rewardTimeoutDuration &&
+                    entry.timestamp > this.lastRewardTime
+        );
+        
+        if (timeoutActions.length > 0) {
+            console.log(`⏰ Timeout reached! Assigning neutral feedback (reward=0) to ${timeoutActions.length} unrewarded actions`);
+            
+            // Assign neutral rewards (0) to timed-out actions - all actions get same weight
+            timeoutActions.forEach(entry => {
+                const trainingExample: TrainingExample = {
+                    state: [...entry.state],
+                    action: [...entry.action],
+                    reward: 0, // Neutral reward - neither positive nor negative
+                    timestamp: entry.timestamp
+                };
+                this.trainingData.push(trainingExample);
+            });
+            
+            console.log(`  All ${timeoutActions.length} timeout actions assigned neutral reward (0.0)`);
+            
+            // Remove the processed actions from temporal memory
+            this.temporalMemory = this.temporalMemory.filter(
+                entry => !timeoutActions.includes(entry)
+            );
+            
+            // Clean training data after adding neutral examples
+            this.cleanTrainingData();
+            
+            // Trigger non-blocking training with the neutral examples (but less frequently)
+            const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
+            if (this.trainingData.length >= 20 && timeSinceLastTraining > 3000) { // Increased threshold and added time gap
+                this.scheduleNonBlockingTraining();
+            }
+        }
+    }
+    
+    /**
+     * Get temporal memory status for debugging
+     */
+    getTemporalMemoryStatus(): { bufferSize: number; oldestEntryAge: number; timeSinceLastReward: number } {
+        const now = Date.now();
+        const oldestEntry = this.temporalMemory.length > 0 ? 
+            Math.min(...this.temporalMemory.map(e => e.timestamp)) : now;
+        
+        return {
+            bufferSize: this.temporalMemory.length,
+            oldestEntryAge: now - oldestEntry,
+            timeSinceLastReward: now - this.lastRewardTime
+        };
+    }
+
+    /**
+     * Clean training data to prevent memory bloat and improve training quality
+     * Removes old entries and balances positive/negative examples
+     */
+    private cleanTrainingData(): void {
+        const now = Date.now();
+        const maxAge = 300000; // Keep data for max 5 minutes
+        const maxEntries = 200; // Maximum total entries
+        
+        // Remove old training data
+        this.trainingData = this.trainingData.filter(
+            example => now - example.timestamp < maxAge
+        );
+        
+        // If still too many entries, keep only the most recent ones
+        if (this.trainingData.length > maxEntries) {
+            this.trainingData.sort((a, b) => b.timestamp - a.timestamp);
+            this.trainingData = this.trainingData.slice(0, maxEntries);
+        }
+        
+        // Balance positive and negative examples for better learning
+        const positiveExamples = this.trainingData.filter(ex => ex.reward > 0);
+        const negativeExamples = this.trainingData.filter(ex => ex.reward <= 0);
+        
+        const maxExamplesPerType = Math.floor(maxEntries / 2);
+        
+        // Keep balanced dataset
+        const balancedPositive = positiveExamples
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, maxExamplesPerType);
+            
+        const balancedNegative = negativeExamples
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, maxExamplesPerType);
+        
+        this.trainingData = [...balancedPositive, ...balancedNegative];
+        
+        console.log(`🧹 Training data cleaned: ${this.trainingData.length} examples (${balancedPositive.length} positive, ${balancedNegative.length} negative)`);
+    }
+
+    /**
+     * Clean up resources when the neural network is no longer needed
+     */
+    public dispose(): void {
+        if (this.model) {
+            this.model.dispose();
+            this.model = null;
+        }
+        
+        if (this.trainingModel) {
+            this.trainingModel.dispose();
+            this.trainingModel = null;
+        }
+        
+        if (this.trainingTimeout) {
+            clearTimeout(this.trainingTimeout);
+            this.trainingTimeout = null;
+        }
+        
+        console.log('🧹 Neural network resources cleaned up');
     }
 }

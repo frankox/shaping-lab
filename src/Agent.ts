@@ -17,14 +17,6 @@ export class Agent implements Drawable {
     private predictionInterval: number;
     private isUpdatingVelocity: boolean;
     private staticObjects: Array<{position: Position, getSize?: () => number, getType?: () => string, getBoundingRadius?: () => number}>;
-    private lastDirectionChange: number;
-    private directionChangeInterval: number;
-    private curiosityFactor: number;
-
-    // Anti-wall-seeking behavior detection and reset
-    private wallSeekingCounter: number = 0;
-    private lastWallProximityCheck: number = 0;
-    private wallProximityCheckInterval: number = 2000; // Check every 2 seconds
 
     constructor(x: number, y: number, canvasWidth: number, canvasHeight: number, neuralNetwork: NeuralNetwork) {
         this.position = { x, y };
@@ -40,14 +32,8 @@ export class Agent implements Drawable {
         this.lastAction = [0, 0];
         this.staticObjects = [];
         this.lastPredictionTime = 0;
-        this.predictionInterval = 250; // Reduced from 300ms to 250ms for more responsive movement
+        this.predictionInterval = 400; // Reduced frequency for better performance
         this.isUpdatingVelocity = false;
-        this.lastDirectionChange = 0;
-        this.directionChangeInterval = 8000 + Math.random() * 7000;
-        this.curiosityFactor = 0.02 + Math.random() * 0.03;
-        this.wallSeekingCounter = 0;
-        this.lastWallProximityCheck = 0;
-        this.wallProximityCheckInterval = 2000;
         
         const initialMovement = this.generateSmoothMovement();
         this.velocity.dx = initialMovement.dx;
@@ -80,12 +66,58 @@ export class Agent implements Drawable {
         }
     }
 
-    // Neural network integration
+    // Neural network integration - PURE AUTONOMOUS CONTROL
     private async updateVelocityWithNeuralNetwork(): Promise<void> {
         if (this.staticObjects.length === 0) {
-            const smoothMovement = this.generateSmoothMovement();
-            this.velocity.dx = smoothMovement.dx;
-            this.velocity.dy = smoothMovement.dy;
+            // Even without objects, let neural network decide
+            const defaultState = this.neuralNetwork.calculateState(
+                this.position,
+                this.canvasWidth,
+                this.canvasHeight,
+                [],
+                this.velocity
+            );
+            
+            try {
+                const movement = await this.neuralNetwork.predict(defaultState);
+                
+                // Apply gradual rotation for smooth movement
+                const rotationSmoothness = 0.15;
+                const speedSmoothness = 0.25;
+                
+                // Blend current velocity with neural network's desired movement
+                this.velocity.dx = this.velocity.dx * (1 - rotationSmoothness) + movement.dx * rotationSmoothness;
+                this.velocity.dy = this.velocity.dy * (1 - rotationSmoothness) + movement.dy * rotationSmoothness;
+                
+                // Optimized speed adjustment
+                const currentSpeedSq = this.velocity.dx * this.velocity.dx + this.velocity.dy * this.velocity.dy;
+                const desiredSpeedSq = movement.dx * movement.dx + movement.dy * movement.dy;
+                
+                if (currentSpeedSq > 0.0001) {
+                    const currentSpeed = Math.sqrt(currentSpeedSq);
+                    const desiredSpeed = Math.sqrt(desiredSpeedSq);
+                    const targetSpeed = currentSpeed * (1 - speedSmoothness) + desiredSpeed * speedSmoothness;
+                    const speedRatio = targetSpeed / currentSpeed;
+                    
+                    this.velocity.dx *= speedRatio;
+                    this.velocity.dy *= speedRatio;
+                }
+                
+                this.lastAction = [movement.dx, movement.dy];
+                
+                // Record action to temporal memory
+                this.neuralNetwork.recordAction(defaultState, this.lastAction);
+            } catch (error) {
+                console.warn('Neural network prediction failed:', error);
+                // Minimal fallback - just basic random movement
+                const angle = Math.random() * Math.PI * 2;
+                this.velocity.dx = Math.cos(angle) * 1.5;
+                this.velocity.dy = Math.sin(angle) * 1.5;
+                this.lastAction = [this.velocity.dx, this.velocity.dy];
+                
+                // Record fallback action to temporal memory
+                this.neuralNetwork.recordAction(defaultState, this.lastAction);
+            }
             return;
         }
 
@@ -98,27 +130,46 @@ export class Agent implements Drawable {
         );
 
         try {
+            // PURE NEURAL NETWORK CONTROL with gradual rotation
             const movement = await this.neuralNetwork.predict(this.currentState);
-            const explorationFactor = 0.1; // Increased from 0.05 for more randomness
-            const smoothMovement = this.generateSmoothMovement();
             
-            // Simple blend - let the improved neural network handle object attraction
-            const newVelX = movement.dx * (1 - explorationFactor) + smoothMovement.dx * explorationFactor;
-            const newVelY = movement.dy * (1 - explorationFactor) + smoothMovement.dy * explorationFactor;
+            // Apply gradual rotation instead of direct velocity assignment
+            const rotationSmoothness = 0.15; // Lower = smoother rotation, higher = more responsive
+            const speedSmoothness = 0.25; // Speed adjustment factor
             
-            // Apply velocity smoothing to prevent sudden direction changes
-            const smoothingFactor = 0.8;
-            this.velocity.dx = this.velocity.dx * smoothingFactor + newVelX * (1 - smoothingFactor);
-            this.velocity.dy = this.velocity.dy * smoothingFactor + newVelY * (1 - smoothingFactor);
+            // Blend current velocity with neural network's desired movement for smooth rotation
+            this.velocity.dx = this.velocity.dx * (1 - rotationSmoothness) + movement.dx * rotationSmoothness;
+            this.velocity.dy = this.velocity.dy * (1 - rotationSmoothness) + movement.dy * rotationSmoothness;
             
-            this.lastAction = [this.velocity.dx, this.velocity.dy];
+            // Optimized speed adjustment - reduce redundant calculations
+            const currentSpeedSq = this.velocity.dx * this.velocity.dx + this.velocity.dy * this.velocity.dy;
+            const desiredSpeedSq = movement.dx * movement.dx + movement.dy * movement.dy;
+            
+            if (currentSpeedSq > 0.0001) { // Avoid division by zero
+                const currentSpeed = Math.sqrt(currentSpeedSq);
+                const desiredSpeed = Math.sqrt(desiredSpeedSq);
+                const targetSpeed = currentSpeed * (1 - speedSmoothness) + desiredSpeed * speedSmoothness;
+                const speedRatio = targetSpeed / currentSpeed;
+                
+                this.velocity.dx *= speedRatio;
+                this.velocity.dy *= speedRatio;
+            }
+            
+            this.lastAction = [movement.dx, movement.dy]; // Record original neural network output
+            
+            // Record action to temporal memory for automatic reward/punishment
+            this.neuralNetwork.recordAction(this.currentState, this.lastAction);
 
         } catch (error) {
-            console.warn('Neural network prediction failed, using smooth movement:', error);
-            const smoothMovement = this.generateSmoothMovement();
-            this.velocity.dx = smoothMovement.dx;
-            this.velocity.dy = smoothMovement.dy;
-            this.lastAction = [smoothMovement.dx, smoothMovement.dy];
+            console.warn('Neural network prediction failed, minimal fallback:', error);
+            // Minimal fallback that doesn't interfere with learning
+            const angle = Math.random() * Math.PI * 2;
+            this.velocity.dx = Math.cos(angle) * 1.5;
+            this.velocity.dy = Math.sin(angle) * 1.5;
+            this.lastAction = [this.velocity.dx, this.velocity.dy];
+            
+            // Record fallback action to temporal memory as well
+            this.neuralNetwork.recordAction(this.currentState, this.lastAction);
         }
     }
 
@@ -133,164 +184,50 @@ export class Agent implements Drawable {
         }
     }
 
-    // Main update loop
+    // Main update loop - PURE NEURAL NETWORK CONTROL
     public update(): void {
         const now = Date.now();
         
+        // More frequent neural network updates for responsive intelligence
         if (now - this.lastPredictionTime > this.predictionInterval && !this.isUpdatingVelocity) {
             this.updateVelocityAsync();
         }
 
-        if (now - this.lastDirectionChange > this.directionChangeInterval) {
-            const smoothMovement = this.generateSmoothMovement();
-            this.velocity.dx += smoothMovement.dx * (this.curiosityFactor * 0.2);
-            this.velocity.dy += smoothMovement.dy * (this.curiosityFactor * 0.2);
-            
-            this.lastDirectionChange = now;
-            this.directionChangeInterval = 10000 + Math.random() * 10000;
-        }
-
+        // Apply neural network movement directly
         this.position.x += this.velocity.dx;
         this.position.y += this.velocity.dy;
         
-        const minSpeed = 0.3;
-        const currentSpeed = Math.sqrt(this.velocity.dx * this.velocity.dx + this.velocity.dy * this.velocity.dy);
-        if (currentSpeed < minSpeed) {
-            const randomBoost = this.generateSmoothMovement();
-            this.velocity.dx += randomBoost.dx * 0.05;
-            this.velocity.dy += randomBoost.dy * 0.05;
-        }
-        
-        const maxSpeed = 3.0;
-        if (currentSpeed > maxSpeed) {
+        // Only essential physics constraints to prevent simulation breaking
+        const currentSpeedSq = this.velocity.dx * this.velocity.dx + this.velocity.dy * this.velocity.dy;
+        const maxSpeedSq = 16.0; // 4.0 squared to avoid sqrt calculation
+        if (currentSpeedSq > maxSpeedSq) {
+            const currentSpeed = Math.sqrt(currentSpeedSq);
+            const maxSpeed = 4.0;
             this.velocity.dx = (this.velocity.dx / currentSpeed) * maxSpeed;
             this.velocity.dy = (this.velocity.dy / currentSpeed) * maxSpeed;
         }
 
+        // Trail rendering for visualization
         this.trail.push({ x: this.position.x, y: this.position.y });
         if (this.trail.length > this.maxTrailLength) {
             this.trail.shift();
         }
 
-        this.checkAndResetWallSeeking();
-        this.handleWallAvoidance();
-        this.checkAndResetWallSeeking();
+        // Only basic wall collision (no artificial movement overrides)
+        this.handleBasicWallCollision();
     }
 
-    // Wall avoidance system
-    private handleWallAvoidance(): void {
-        const wallBuffer = 50; // Reduced from 60 to make less aggressive
-        const pushStrength = 2.0; // Reduced from 2.5
-        let needsPush = false;
-        
-        const distToLeft = this.position.x;
-        const distToRight = this.canvasWidth - this.position.x;
-        const distToTop = this.position.y;
-        const distToBottom = this.canvasHeight - this.position.y;
-        
-        if (distToLeft < wallBuffer) {
-            this.velocity.dx += pushStrength * (wallBuffer - distToLeft) / wallBuffer;
-            needsPush = true;
-        }
-        if (distToRight < wallBuffer) {
-            this.velocity.dx -= pushStrength * (wallBuffer - distToRight) / wallBuffer;
-            needsPush = true;
-        }
-        if (distToTop < wallBuffer) {
-            this.velocity.dy += pushStrength * (wallBuffer - distToTop) / wallBuffer;
-            needsPush = true;
-        }
-        if (distToBottom < wallBuffer) {
-            this.velocity.dy -= pushStrength * (wallBuffer - distToBottom) / wallBuffer;
-            needsPush = true;
-        }
-
-        // Hard boundary collision with reduced bouncing
+    // Basic wall collision - only prevent agent from leaving canvas
+    private handleBasicWallCollision(): void {
+        // Hard boundary collision only
         if (this.position.x <= this.size || this.position.x >= this.canvasWidth - this.size) {
-            this.velocity.dx *= -0.6; // Reduced bounce from -0.8 to -0.6
+            this.velocity.dx *= -0.3; // Gentle bounce
             this.position.x = Math.max(this.size, Math.min(this.canvasWidth - this.size, this.position.x));
-            
-            // Gentler push away from walls
-            if (this.position.x <= this.size) {
-                this.velocity.dx += 1.0; // Reduced from 1.5
-            } else {
-                this.velocity.dx -= 1.0; // Reduced from 1.5
-            }
         }
         
         if (this.position.y <= this.size || this.position.y >= this.canvasHeight - this.size) {
-            this.velocity.dy *= -0.6; // Reduced bounce from -0.8 to -0.6
+            this.velocity.dy *= -0.3; // Gentle bounce
             this.position.y = Math.max(this.size, Math.min(this.canvasHeight - this.size, this.position.y));
-            
-            // Gentler push away from walls
-            if (this.position.y <= this.size) {
-                this.velocity.dy += 1.0; // Reduced from 1.5
-            } else {
-                this.velocity.dy -= 1.0; // Reduced from 1.5
-            }
-        }
-
-        // Stronger center attraction when near walls
-        if (needsPush) {
-            const centerX = this.canvasWidth / 2;
-            const centerY = this.canvasHeight / 2;
-            const towardsCenterX = centerX - this.position.x;
-            const towardsCenterY = centerY - this.position.y;
-            const distance = Math.sqrt(towardsCenterX * towardsCenterX + towardsCenterY * towardsCenterY);
-            
-            if (distance > 0) {
-                const centerAttraction = 1.2; // Increased from 0.8 to provide stronger center pull
-                this.velocity.dx += (towardsCenterX / distance) * centerAttraction;
-                this.velocity.dy += (towardsCenterY / distance) * centerAttraction;
-            }
-        }
-    }
-
-    // Anti-wall-seeking behavior detection and reset
-    private checkAndResetWallSeeking(): void {
-        const now = Date.now();
-        if (now - this.lastWallProximityCheck < this.wallProximityCheckInterval) {
-            return;
-        }
-        
-        this.lastWallProximityCheck = now;
-        
-        // Focus on object distance instead of wall distance
-        if (this.currentState.length >= 17) {
-            const circleDistance = this.currentState[4];
-            const squareDistance = this.currentState[8];
-            const diamondDistance = this.currentState[12];
-            const nearestObjectDist = Math.min(circleDistance, squareDistance, diamondDistance);
-            
-            // Check if agent is consistently avoiding objects
-            if (nearestObjectDist > 0.6) {
-                this.wallSeekingCounter++;
-                console.log(`⚠️ Object-avoidance detected: ${this.wallSeekingCounter}/3`);
-                
-                if (this.wallSeekingCounter >= 3) {
-                    console.log('🚨 Object-avoidance behavior detected! Resetting and seeking objects...');
-                    this.neuralNetwork.clearWallSeekingData();
-                    this.wallSeekingCounter = 0;
-                    
-                    // Force agent toward nearest object instead of center
-                    const objects = [
-                        { distance: circleDistance, dirX: this.currentState[5], dirY: this.currentState[6] },
-                        { distance: squareDistance, dirX: this.currentState[9], dirY: this.currentState[10] },
-                        { distance: diamondDistance, dirX: this.currentState[13], dirY: this.currentState[14] }
-                    ];
-                    
-                    const nearestObject = objects.reduce((nearest, current) => 
-                        current.distance < nearest.distance ? current : nearest
-                    );
-                    
-                    this.velocity.dx += nearestObject.dirX * 1.5;
-                    this.velocity.dy += nearestObject.dirY * 1.5;
-                    console.log('🎯 Forcing movement toward nearest object');
-                }
-            } else {
-                // Reset counter if agent moves toward objects
-                this.wallSeekingCounter = Math.max(0, this.wallSeekingCounter - 1);
-            }
         }
     }
 
@@ -325,9 +262,9 @@ export class Agent implements Drawable {
     // Training methods
     public reward(): void {
         if (this.currentState.length > 0 && this.lastAction.length > 0) {
-            this.neuralNetwork.recordReward(this.currentState, this.lastAction);
-            console.log('🎉 Agent rewarded! Learning from this behavior...');
-            this.neuralNetwork.maybeTrainModel();
+            // Use new temporal memory system for automatic reward assignment
+            this.neuralNetwork.giveManualReward(0.8);
+            console.log('🎉 Agent rewarded! Converting recent actions to positive examples...');
         }
 
         this.color = '#2ed573';
@@ -341,9 +278,9 @@ export class Agent implements Drawable {
 
     public punish(): void {
         if (this.currentState.length > 0 && this.lastAction.length > 0) {
-            this.neuralNetwork.recordPunishment(this.currentState, this.lastAction);
-            console.log('❌ Agent punished! Learning to avoid this behavior...');
-            this.neuralNetwork.maybeTrainModel();
+            // Use new temporal memory system for manual punishment with temporal weighting
+            this.neuralNetwork.giveManualPunishment(0.6);
+            console.log('❌ Agent punished! Converting recent actions to temporally weighted negative examples...');
         }
 
         this.color = '#ff3742';

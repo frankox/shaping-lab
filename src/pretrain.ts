@@ -4,7 +4,6 @@ import { Circle, Square, Diamond } from './StaticObjects.js';
 /**
  * Pretraining script for the Shaping Lab neural network
  * This script trains the network to be interested in objects before the main app runs
- * Run this separately to create a pre-trained model state
  */
 
 async function pretrainNetwork() {
@@ -23,26 +22,36 @@ async function pretrainNetwork() {
         new Diamond(400, 450, 70)
     ];
     
+    // Update status
+    const statusElement = document.getElementById('status');
+    if (statusElement) {
+        statusElement.textContent += '🧠 Neural network initialized\n';
+        statusElement.textContent += '📊 Generating synthetic training data...\n';
+    }
+    
     // Pretrain the network to be interested in objects
-    console.log('📚 Running pretraining with 50 positive examples...');
+    console.log('📚 Running pretraining with object-interest examples...');
     await neuralNetwork.pretrainObjectInterest(canvasWidth, canvasHeight, staticObjects);
+    
+    // Mark as ready
+    neuralNetwork.markAsReady();
     
     // Get training stats
     const stats = neuralNetwork.getStats();
     console.log('✅ Pretraining completed!');
     console.log(`Training data size: ${stats.dataSize} examples`);
-    console.log(`Last training: ${new Date(stats.lastTraining).toLocaleString()}`);
+    console.log(`Network ready: ${stats.isReady}`);
     
-    // Save the trained model (this would require additional implementation)
-    console.log('💾 Model state is now ready for the main application');
-    console.log('🎯 The agent should now show interest in objects when rewarded manually');
+    if (statusElement) {
+        statusElement.textContent += `✅ Training completed with ${stats.dataSize} examples\n`;
+        statusElement.textContent += '🎯 Neural network is now ready for use!\n';
+        statusElement.textContent += '🎮 You can now go to the main app for manual training\n';
+    }
+    
+    // Store the trained network for the main app to use
+    (window as any).pretrainedNetwork = neuralNetwork;
     
     return neuralNetwork;
-}
-
-// Run pretraining if this script is executed directly
-if (typeof window !== 'undefined' && (window as any).runPretraining) {
-    pretrainNetwork().catch(console.error);
 }
 
 export { pretrainNetwork };
