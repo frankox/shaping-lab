@@ -48,6 +48,13 @@ h1 {
     gap: 15px;
 }
 
+.button-group {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 .reward-button {
     background: linear-gradient(45deg, #ff6b6b, #feca57);
     border: none;
@@ -74,6 +81,32 @@ h1 {
     box-shadow: 0 2px 10px rgba(255, 107, 107, 0.3);
 }
 
+.punish-button {
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    border: none;
+    color: white;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.punish-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+    background: linear-gradient(45deg, #c0392b, #a93226);
+}
+
+.punish-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(231, 76, 60, 0.3);
+}
+
 .status {
     color: #666;
     font-size: 1.1rem;
@@ -91,10 +124,64 @@ h1 {
     animation: pulse 0.5s ease-in-out;
 }
 
+.status.punished {
+    background: linear-gradient(45deg, #e53e3e, #c53030);
+    color: white;
+    border-color: #e53e3e;
+    animation: pulse 0.5s ease-in-out;
+}
+
 @keyframes pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.05); }
     100% { transform: scale(1); }
+}
+
+.instructions {
+    margin-top: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    border-radius: 15px;
+    text-align: left;
+    max-width: 600px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.instructions p {
+    margin: 0 0 10px 0;
+    color: #4a5568;
+    font-size: 1.1rem;
+}
+
+.instructions ol {
+    margin: 0;
+    padding-left: 20px;
+    color: #666;
+}
+
+.instructions li {
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.pretrain-link {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-left: 10px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.pretrain-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    text-decoration: none;
+    color: white;
 }
 
 @media (max-width: 768px) {
@@ -110,5 +197,10 @@ h1 {
     .reward-button {
         padding: 12px 24px;
         font-size: 1rem;
+    }
+    
+    .instructions {
+        padding: 15px;
+        font-size: 0.9rem;
     }
 }

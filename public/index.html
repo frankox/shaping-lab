@@ -6,6 +6,7 @@
     <title>Interactive Agent Environment</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -13,7 +14,19 @@
         <div id="canvas-container"></div>
         <div class="controls">
             <button id="reward-btn" class="reward-button">🎉 Reward Agent</button>
-            <div id="status" class="status">Agent is exploring...</div>
+            <a href="pretrain.html" class="pretrain-link">🧠 Neural Network Pretraining</a>
+            <div id="status" class="status">Agent is learning...</div>
+            <div class="instructions">
+                <p><strong>Instructions:</strong></p>
+                <ol>
+                    <li>Optional: Use the <strong>Pretraining</strong> page to give the agent basic object knowledge</li>
+                    <li>Watch the red agent move around using its neural network</li>
+                    <li>Click "Reward Agent" when you like its behavior (e.g., when near objects)</li>
+                    <li>The agent learns ONLY from your manual rewards - no automatic training</li>
+                    <li>Training happens immediately when you reward the agent</li>
+                    <li>Check the console (F12) for detailed learning logs</li>
+                </ol>
+            </div>
         </div>
     </div>
     <script src="main.js" type="module"></script>
