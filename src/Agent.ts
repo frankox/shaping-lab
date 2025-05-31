@@ -21,6 +21,11 @@ export class Agent implements Drawable {
     private directionChangeInterval: number;
     private curiosityFactor: number;
 
+    // Anti-wall-seeking behavior detection and reset
+    private wallSeekingCounter: number = 0;
+    private lastWallProximityCheck: number = 0;
+    private wallProximityCheckInterval: number = 2000; // Check every 2 seconds
+
     constructor(x: number, y: number, canvasWidth: number, canvasHeight: number, neuralNetwork: NeuralNetwork) {
         this.position = { x, y };
         this.velocity = { dx: 0, dy: 0 };
@@ -35,11 +40,14 @@ export class Agent implements Drawable {
         this.lastAction = [0, 0];
         this.staticObjects = [];
         this.lastPredictionTime = 0;
-        this.predictionInterval = 300;
+        this.predictionInterval = 250; // Reduced from 300ms to 250ms for more responsive movement
         this.isUpdatingVelocity = false;
         this.lastDirectionChange = 0;
         this.directionChangeInterval = 8000 + Math.random() * 7000;
         this.curiosityFactor = 0.02 + Math.random() * 0.03;
+        this.wallSeekingCounter = 0;
+        this.lastWallProximityCheck = 0;
+        this.wallProximityCheckInterval = 2000;
         
         const initialMovement = this.generateSmoothMovement();
         this.velocity.dx = initialMovement.dx;
@@ -91,11 +99,18 @@ export class Agent implements Drawable {
 
         try {
             const movement = await this.neuralNetwork.predict(this.currentState);
-            const explorationFactor = 0.05;
+            const explorationFactor = 0.1; // Increased from 0.05 for more randomness
             const smoothMovement = this.generateSmoothMovement();
             
-            this.velocity.dx = movement.dx * (1 - explorationFactor) + smoothMovement.dx * explorationFactor;
-            this.velocity.dy = movement.dy * (1 - explorationFactor) + smoothMovement.dy * explorationFactor;
+            // Simple blend - let the improved neural network handle object attraction
+            const newVelX = movement.dx * (1 - explorationFactor) + smoothMovement.dx * explorationFactor;
+            const newVelY = movement.dy * (1 - explorationFactor) + smoothMovement.dy * explorationFactor;
+            
+            // Apply velocity smoothing to prevent sudden direction changes
+            const smoothingFactor = 0.8;
+            this.velocity.dx = this.velocity.dx * smoothingFactor + newVelX * (1 - smoothingFactor);
+            this.velocity.dy = this.velocity.dy * smoothingFactor + newVelY * (1 - smoothingFactor);
+            
             this.lastAction = [this.velocity.dx, this.velocity.dy];
 
         } catch (error) {
@@ -157,13 +172,15 @@ export class Agent implements Drawable {
             this.trail.shift();
         }
 
+        this.checkAndResetWallSeeking();
         this.handleWallAvoidance();
+        this.checkAndResetWallSeeking();
     }
 
     // Wall avoidance system
     private handleWallAvoidance(): void {
-        const wallBuffer = 60;
-        const pushStrength = 2.5;
+        const wallBuffer = 50; // Reduced from 60 to make less aggressive
+        const pushStrength = 2.0; // Reduced from 2.5
         let needsPush = false;
         
         const distToLeft = this.position.x;
@@ -188,28 +205,32 @@ export class Agent implements Drawable {
             needsPush = true;
         }
 
+        // Hard boundary collision with reduced bouncing
         if (this.position.x <= this.size || this.position.x >= this.canvasWidth - this.size) {
-            this.velocity.dx *= -0.8;
+            this.velocity.dx *= -0.6; // Reduced bounce from -0.8 to -0.6
             this.position.x = Math.max(this.size, Math.min(this.canvasWidth - this.size, this.position.x));
             
+            // Gentler push away from walls
             if (this.position.x <= this.size) {
-                this.velocity.dx += 1.5;
+                this.velocity.dx += 1.0; // Reduced from 1.5
             } else {
-                this.velocity.dx -= 1.5;
+                this.velocity.dx -= 1.0; // Reduced from 1.5
             }
         }
         
         if (this.position.y <= this.size || this.position.y >= this.canvasHeight - this.size) {
-            this.velocity.dy *= -0.8;
+            this.velocity.dy *= -0.6; // Reduced bounce from -0.8 to -0.6
             this.position.y = Math.max(this.size, Math.min(this.canvasHeight - this.size, this.position.y));
             
+            // Gentler push away from walls
             if (this.position.y <= this.size) {
-                this.velocity.dy += 1.5;
+                this.velocity.dy += 1.0; // Reduced from 1.5
             } else {
-                this.velocity.dy -= 1.5;
+                this.velocity.dy -= 1.0; // Reduced from 1.5
             }
         }
 
+        // Stronger center attraction when near walls
         if (needsPush) {
             const centerX = this.canvasWidth / 2;
             const centerY = this.canvasHeight / 2;
@@ -218,9 +239,57 @@ export class Agent implements Drawable {
             const distance = Math.sqrt(towardsCenterX * towardsCenterX + towardsCenterY * towardsCenterY);
             
             if (distance > 0) {
-                const centerAttraction = 0.8;
+                const centerAttraction = 1.2; // Increased from 0.8 to provide stronger center pull
                 this.velocity.dx += (towardsCenterX / distance) * centerAttraction;
                 this.velocity.dy += (towardsCenterY / distance) * centerAttraction;
+            }
+        }
+    }
+
+    // Anti-wall-seeking behavior detection and reset
+    private checkAndResetWallSeeking(): void {
+        const now = Date.now();
+        if (now - this.lastWallProximityCheck < this.wallProximityCheckInterval) {
+            return;
+        }
+        
+        this.lastWallProximityCheck = now;
+        
+        // Focus on object distance instead of wall distance
+        if (this.currentState.length >= 17) {
+            const circleDistance = this.currentState[4];
+            const squareDistance = this.currentState[8];
+            const diamondDistance = this.currentState[12];
+            const nearestObjectDist = Math.min(circleDistance, squareDistance, diamondDistance);
+            
+            // Check if agent is consistently avoiding objects
+            if (nearestObjectDist > 0.6) {
+                this.wallSeekingCounter++;
+                console.log(`⚠️ Object-avoidance detected: ${this.wallSeekingCounter}/3`);
+                
+                if (this.wallSeekingCounter >= 3) {
+                    console.log('🚨 Object-avoidance behavior detected! Resetting and seeking objects...');
+                    this.neuralNetwork.clearWallSeekingData();
+                    this.wallSeekingCounter = 0;
+                    
+                    // Force agent toward nearest object instead of center
+                    const objects = [
+                        { distance: circleDistance, dirX: this.currentState[5], dirY: this.currentState[6] },
+                        { distance: squareDistance, dirX: this.currentState[9], dirY: this.currentState[10] },
+                        { distance: diamondDistance, dirX: this.currentState[13], dirY: this.currentState[14] }
+                    ];
+                    
+                    const nearestObject = objects.reduce((nearest, current) => 
+                        current.distance < nearest.distance ? current : nearest
+                    );
+                    
+                    this.velocity.dx += nearestObject.dirX * 1.5;
+                    this.velocity.dy += nearestObject.dirY * 1.5;
+                    console.log('🎯 Forcing movement toward nearest object');
+                }
+            } else {
+                // Reset counter if agent moves toward objects
+                this.wallSeekingCounter = Math.max(0, this.wallSeekingCounter - 1);
             }
         }
     }

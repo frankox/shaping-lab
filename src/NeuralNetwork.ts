@@ -61,9 +61,9 @@ export class NeuralNetwork {
             ]
         });
 
-        // Compile the model with better optimizer
+        // Compile the model with a conservative optimizer
         this.model.compile({
-            optimizer: (window as any).tf.train.adam(0.003), // Even lower learning rate for complex network
+            optimizer: (window as any).tf.train.adam(0.001), // Reduced learning rate from 0.003 to 0.001
             loss: 'meanSquaredError',
             metrics: ['mse']
         });
@@ -148,10 +148,10 @@ export class NeuralNetwork {
     }
 
     /**
-     * Predict the next movement direction using the enhanced neural network
+     * Predict the next movement direction using object-focused neural network
      */
     public async predict(state: number[]): Promise<{dx: number, dy: number}> {
-        const inputTensor = (window as any).tf.tensor2d([state], [1, 19]); // Updated to 19 features
+        const inputTensor = (window as any).tf.tensor2d([state], [1, 19]);
         const prediction = this.model.predict(inputTensor) as any;
         const output = await prediction.data();
         
@@ -159,50 +159,162 @@ export class NeuralNetwork {
         inputTensor.dispose();
         prediction.dispose();
 
-        // Intelligent movement scaling based on environmental awareness
-        const movementScale = 8.0;
+        // OBJECT-FOCUSED MOVEMENT LOGIC
+        // Get object distances and directions
+        const circleDistance = state[4];
+        const circleDirX = state[5];
+        const circleDirY = state[6];
         
-        // Extract relevant state information for intelligent scaling
-        const agentVelX = state[2] * 20; // Denormalize velocity
-        const agentVelY = state[3] * 20;
-        const currentSpeed = Math.sqrt(agentVelX * agentVelX + agentVelY * agentVelY);
+        const squareDistance = state[8];
+        const squareDirX = state[9];
+        const squareDirY = state[10];
         
-        // Get distances to objects (every 4th element starting from index 4)
-        const objectDistances = [state[4], state[8], state[12]]; // Circle, Square, Diamond distances
-        const nearestObjectDist = Math.min(...objectDistances);
+        const diamondDistance = state[12];
+        const diamondDirX = state[13];
+        const diamondDirY = state[14];
         
-        // Reduce prediction strength if already moving fast (momentum consideration)
-        const momentumFactor = Math.max(0.3, 1.0 - (currentSpeed / 20.0));
+        // Find the nearest object
+        const objects = [
+            { distance: circleDistance, dirX: circleDirX, dirY: circleDirY },
+            { distance: squareDistance, dirX: squareDirX, dirY: squareDirY },
+            { distance: diamondDistance, dirX: diamondDirX, dirY: diamondDirY }
+        ];
         
-        // Increase responsiveness when near objects (object avoidance/attraction)
-        const objectProximityFactor = 1.0 + (1.0 - nearestObjectDist) * 0.5;
+        const nearestObject = objects.reduce((nearest, current) => 
+            current.distance < nearest.distance ? current : nearest
+        );
+        
+        // STRONG OBJECT ATTRACTION - Override neural network when far from objects
+        let finalDx = output[0];
+        let finalDy = output[1];
+        
+        const objectAttractionStrength = 0.6; // Strong attraction to nearest object
+        const baseMovementScale = 1.5;
+        
+        // If we're far from all objects, move toward the nearest one
+        if (nearestObject.distance > 0.4) {
+            // Override neural network with object-seeking behavior
+            finalDx = finalDx * 0.3 + nearestObject.dirX * objectAttractionStrength;
+            finalDy = finalDy * 0.3 + nearestObject.dirY * objectAttractionStrength;
+            console.log('🎯 Seeking nearest object');
+        } else {
+            // Close to objects, let neural network decide with gentle object bias
+            finalDx = finalDx + nearestObject.dirX * 0.2;
+            finalDy = finalDy + nearestObject.dirY * 0.2;
+        }
+        
+        // Apply base scaling
+        finalDx *= baseMovementScale;
+        finalDy *= baseMovementScale;
+        
+        // WALL AVOIDANCE (secondary concern)
+        const wallDist = state[16];
+        if (wallDist < 0.2) {
+            const centerX = state[17];
+            const centerY = state[18];
+            const wallAvoidanceStrength = (0.2 - wallDist) / 0.2;
+            
+            finalDx += centerX * wallAvoidanceStrength * 0.5;
+            finalDy += centerY * wallAvoidanceStrength * 0.5;
+        }
         
         return {
-            dx: output[0] * movementScale * momentumFactor * objectProximityFactor,
-            dy: output[1] * movementScale * momentumFactor * objectProximityFactor
+            dx: Math.max(-2.5, Math.min(2.5, finalDx)),
+            dy: Math.max(-2.5, Math.min(2.5, finalDy))
         };
     }
 
     /**
      * Record a positive training example when the user rewards the agent
+     * Focus on object proximity rather than wall avoidance
      */
     public recordReward(state: number[], action: number[]): void {
+        // Get object distances
+        const circleDistance = state[4];
+        const squareDistance = state[8];
+        const diamondDistance = state[12];
+        const nearestObjectDist = Math.min(circleDistance, squareDistance, diamondDistance);
+        
+        // REWARD BASED ON OBJECT PROXIMITY (not wall distance)
+        let adjustedReward = 1.0;
+        
+        // Increase reward when close to objects!
+        if (nearestObjectDist < 0.3) {
+            adjustedReward = 2.0; // Double reward for being near objects
+            console.log(`🎯 BONUS reward for object proximity! Distance: ${(nearestObjectDist * 100).toFixed(1)}%`);
+        } else if (nearestObjectDist < 0.5) {
+            adjustedReward = 1.5; // 50% bonus for moderate object proximity
+            console.log(`🎯 Bonus reward for object proximity! Distance: ${(nearestObjectDist * 100).toFixed(1)}%`);
+        }
+        
+        // Only reduce reward if agent is both far from objects AND near walls
+        const wallDistance = state[16];
+        if (nearestObjectDist > 0.7 && wallDistance < 0.2) {
+            adjustedReward = 0.5; // Reduce reward only when ignoring objects AND near walls
+            console.log(`⚠️ Reduced reward: far from objects (${(nearestObjectDist * 100).toFixed(1)}%) and near walls`);
+        }
+
         const example: TrainingExample = {
             state: [...state],
             action: [...action],
-            reward: 1.0,
+            reward: adjustedReward,
             timestamp: Date.now()
         };
 
         this.trainingData.push(example);
-        console.log(`Reward recorded! Training data size: ${this.trainingData.length}`);
-        console.log('State:', state.map(x => x.toFixed(3)));
-        console.log('Action:', action.map(x => x.toFixed(3)));
-
-        // Limit training data size to prevent memory issues
-        if (this.trainingData.length > 1000) {
-            this.trainingData = this.trainingData.slice(-500); // Keep most recent 500 examples
+        
+        // Add strong object-seeking examples
+        if (nearestObjectDist > 0.4) {
+            // Create examples that move toward the nearest object
+            const objects = [
+                { distance: circleDistance, dirX: state[5], dirY: state[6] },
+                { distance: squareDistance, dirX: state[9], dirY: state[10] },
+                { distance: diamondDistance, dirX: state[13], dirY: state[14] }
+            ];
+            
+            const nearestObject = objects.reduce((nearest, current) => 
+                current.distance < nearest.distance ? current : nearest
+            );
+            
+            // Create an action that moves toward the nearest object
+            const objectSeekingAction = [nearestObject.dirX * 2.0, nearestObject.dirY * 2.0];
+            
+            const objectExample: TrainingExample = {
+                state: [...state],
+                action: objectSeekingAction,
+                reward: 2.5, // Very high reward for object-seeking behavior
+                timestamp: Date.now()
+            };
+            
+            this.trainingData.push(objectExample);
+            console.log(`🎯 Added object-seeking example (toward nearest object)`);
         }
+
+        console.log(`Reward recorded! Training data size: ${this.trainingData.length}`);
+        console.log('Adjusted reward:', adjustedReward);
+        console.log('Nearest object distance:', (nearestObjectDist * 100).toFixed(1) + '%');
+
+        // Limit training data size
+        if (this.trainingData.length > 1000) {
+            this.trainingData = this.trainingData.slice(-500);
+        }
+    }
+
+    /**
+     * Clear training data that encourages wall-seeking behavior
+     * This helps reset the agent when it develops bad habits
+     */
+    public clearWallSeekingData(): void {
+        const originalSize = this.trainingData.length;
+        
+        // Remove training examples where the agent was very close to walls
+        this.trainingData = this.trainingData.filter(example => {
+            const wallDistance = example.state[16]; // Normalized wall distance
+            return wallDistance > 0.25; // Keep only examples where agent was reasonably far from walls
+        });
+        
+        const removedCount = originalSize - this.trainingData.length;
+        console.log(`🧹 Cleared ${removedCount} wall-seeking training examples. Remaining: ${this.trainingData.length}`);
     }
 
     /**
@@ -300,119 +412,71 @@ export class NeuralNetwork {
         console.log('🎯 Pretraining neural network to be interested in objects...');
         
         const pretrainingExamples: TrainingExample[] = [];
-        const numExamples = 500; // Generate 50 pretraining examples
+        const numExamples = 200; // Reduced to a reasonable number for quality over quantity
         
         for (let i = 0; i < numExamples; i++) {
-            // Random agent position (avoiding edges)
-            const agentX = 50 + Math.random() * (canvasWidth - 100);
-            const agentY = 50 + Math.random() * (canvasHeight - 100);
+            // Random agent position (favoring center area, not edges)
+            const marginPercent = 0.25; // Keep agent in center 50% of canvas
+            const centerMarginX = canvasWidth * marginPercent;
+            const centerMarginY = canvasHeight * marginPercent;
             
-            // Random velocity
-            const velX = (Math.random() - 0.5) * 10;
-            const velY = (Math.random() - 0.5) * 10;
+            const agentX = centerMarginX + Math.random() * (canvasWidth - 2 * centerMarginX);
+            const agentY = centerMarginY + Math.random() * (canvasHeight - 2 * centerMarginY);
             
-            // Calculate state features for this position
-            const state = this.calculateStateForPosition(agentX, agentY, velX, velY, canvasWidth, canvasHeight, objects);
+            // Zero or small random velocity
+            const velX = (Math.random() - 0.5) * 2; // Smaller velocity range
+            const velY = (Math.random() - 0.5) * 2;
             
-            // Find nearest object
-            let nearestObj: typeof objects[0] | null = null;
-            let minDist = Infinity;
+            // Calculate state for this position
+            const state = this.calculateState(
+                { x: agentX, y: agentY },
+                canvasWidth,
+                canvasHeight,
+                objects,
+                { dx: velX, dy: velY }
+            );
             
-            objects.forEach(obj => {
-                const dist = Math.sqrt((obj.position.x - agentX) ** 2 + (obj.position.y - agentY) ** 2);
-                if (dist < minDist) {
-                    minDist = dist;
-                    nearestObj = obj;
-                }
-            });
+            // Find nearest object and create action toward it
+            const circleDistance = state[4];
+            const squareDistance = state[8];
+            const diamondDistance = state[12];
             
-            if (nearestObj) {
-                // Calculate movement toward nearest object
-                const objPos = (nearestObj as any).position;
-                const toObjectX = objPos.x - agentX;
-                const toObjectY = objPos.y - agentY;
-                const distance = Math.sqrt(toObjectX ** 2 + toObjectY ** 2);
-                
-                // Normalize and scale the movement
-                const moveStrength = 8; // Moderate movement speed
-                const actionX = (toObjectX / distance) * moveStrength;
-                const actionY = (toObjectY / distance) * moveStrength;
-                
-                // Create positive training example
-                const example: TrainingExample = {
-                    state: state,
-                    action: [actionX, actionY],
-                    reward: 1.0,
-                    timestamp: Date.now() + i // Slightly different timestamps
-                };
-                
-                pretrainingExamples.push(example);
-            }
+            const objectInfo = [
+                { distance: circleDistance, dirX: state[5], dirY: state[6] },
+                { distance: squareDistance, dirX: state[9], dirY: state[10] },
+                { distance: diamondDistance, dirX: state[13], dirY: state[14] }
+            ];
+            
+            const nearestObject = objectInfo.reduce((nearest, current) => 
+                current.distance < nearest.distance ? current : nearest
+            );
+            
+            // Create action that moves toward nearest object
+            const objectSeekingAction = [
+                nearestObject.dirX * 1.5, // Move toward object
+                nearestObject.dirY * 1.5
+            ];
+            
+            // Higher reward for being closer to objects
+            const proximityReward = 2.0 - nearestObject.distance; // Closer = higher reward
+            
+            const example: TrainingExample = {
+                state: [...state],
+                action: objectSeekingAction,
+                reward: Math.max(1.0, proximityReward), // At least 1.0 reward
+                timestamp: Date.now() - i // Vary timestamps
+            };
+            
+            pretrainingExamples.push(example);
         }
         
-        // Add pretraining examples to training data
-        this.trainingData.push(...pretrainingExamples);
-        console.log(`✅ Added ${pretrainingExamples.length} pretraining examples encouraging object interest`);
-        console.log(`Total training data: ${this.trainingData.length} examples`);
+        // Add all pretraining examples to training data
+        this.trainingData = [...pretrainingExamples, ...this.trainingData];
         
-        // Train the model immediately with the pretraining data
+        console.log(`✅ Added ${numExamples} object-focused pretraining examples`);
+        console.log(`📊 Total training data: ${this.trainingData.length} examples`);
+        
+        // Train immediately on this data
         this.trainModel();
-    }
-
-    /**
-     * Calculate state features for a given position (used for pretraining)
-     */
-    private calculateStateForPosition(x: number, y: number, velX: number, velY: number,
-                                    canvasWidth: number, canvasHeight: number,
-                                    objects: Array<{position: Position, getSize?: () => number}>): number[] {
-        const state: number[] = [];
-        
-        // Agent position and velocity (normalized)
-        state.push(x / canvasWidth);
-        state.push(y / canvasHeight);
-        state.push(velX / 20); // Normalize velocity
-        state.push(velY / 20);
-        
-        // Object distances and relative positions
-        objects.forEach(obj => {
-            const dx = obj.position.x - x;
-            const dy = obj.position.y - y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const maxDistance = Math.sqrt(canvasWidth * canvasWidth + canvasHeight * canvasHeight);
-            
-            state.push(distance / maxDistance); // Normalized distance
-            state.push(dx / canvasWidth); // Relative X position
-            state.push(dy / canvasHeight); // Relative Y position
-            
-            // Approach calculation (dot product of velocity and direction to object)
-            const velMagnitude = Math.sqrt(velX * velX + velY * velY);
-            const approach = velMagnitude > 0 ? ((velX * dx + velY * dy) / (velMagnitude * distance)) : 0;
-            state.push(approach);
-        });
-        
-        // Wall proximity and center direction
-        const nearestWallDist = Math.min(x, y, canvasWidth - x, canvasHeight - y);
-        state.push(nearestWallDist / Math.min(canvasWidth, canvasHeight));
-        
-        const toCenterX = (canvasWidth / 2) - x;
-        const toCenterY = (canvasHeight / 2) - y;
-        const centerDistance = Math.sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
-        state.push(centerDistance > 0 ? toCenterX / centerDistance : 0);
-        state.push(centerDistance > 0 ? toCenterY / centerDistance : 0);
-        
-        return state;
-    }
-
-    public generateRandomMovement(): {dx: number, dy: number} {
-        // Much more dynamic random movement with higher speed variations
-        const baseSpeed = 10; // Increased from 5 to 10
-        const speedVariation = 8; // Increased from 4 to 8
-        const angle = Math.random() * Math.PI * 2;
-        const speed = baseSpeed + (Math.random() - 0.5) * speedVariation;
-        
-        return {
-            dx: Math.cos(angle) * speed,
-            dy: Math.sin(angle) * speed
-        };
     }
 }
