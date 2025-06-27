@@ -4,7 +4,8 @@
 This is an interactive web application built with TypeScript and p5.js that simulates a 2D environment with:
 - An Agent that moves randomly within a canvas
 - Static objects (circle, square, diamond) 
-- A reward system for reinforcement learning concepts
+- A reward system for reinforcement learning, to simulate a shaping session
+- Pretraining logic for the agent (if applicable)
 
 ## Code Standards
 - Use TypeScript with strict type checking
@@ -13,7 +14,8 @@ This is an interactive web application built with TypeScript and p5.js that simu
 - Maintain clean separation between classes and responsibilities
 - Use meaningful variable and function names
 - Do not write unnecessary comments; code should be self-explanatory
-- Maintain the copilot-instructions file up-to-date with any changes in architecture or workflow
+- Maintain the copilot-instructions file up-to-date with any changes in architecture or 
+- Use self closing tags for HTML elements in TypeScript files
 
 ## Agent Workflow Optimization
 - Always prefer direct actions over questions when requirements are clear or can be inferred from context.
@@ -23,6 +25,13 @@ This is an interactive web application built with TypeScript and p5.js that simu
 - Prioritize atomic, self-contained changes to minimize errors and maximize reliability.
 - Validate changes by checking for errors after each edit, and resolve them if possible before proceeding.
 - Keep this file updated with any new workflow, architecture, or process changes that impact agent efficiency.
+
+## Copilot Chat Instructions
+- When describing changes, be minimal and precise.
+- When writing in chat, keep explanations concise and focused, be minimal and avoid repetition.
+- Avoid asking for confirmation on every execution, assume the agent understands the context and can make informed decisions.
+- Avoid unnecessary prompts; if clarification is needed, ask specific questions.
+- Avoid emotional language or expressions.
 
 ## Architecture & File Structure
 

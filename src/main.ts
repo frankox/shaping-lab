@@ -18,127 +18,17 @@ export class Environment {
         this.canvasHeight = 600;
         this.staticObjects = [];
         this.neuralNetwork = new NeuralNetwork();
-        this.isPretraining = true;
+        this.isPretraining = false;
         this.canvasInitialized = false;
-        
-        // Start with pretraining screen instead of canvas
-        this.startPretrainingFlow();
-    }
-
-    private async startPretrainingFlow(): Promise<void> {
-        // Show pretraining interface
-        this.showPretrainingScreen();
         
         // Check if we have a pretrained network from the pretraining page
         if ((window as any).pretrainedNetwork) {
             console.log('✅ Using pretrained network from pretraining page');
             this.neuralNetwork = (window as any).pretrainedNetwork;
-            this.completePretraining();
-            return;
         }
         
-        // Otherwise, run auto-pretraining
-        console.log('🚀 Starting automatic pretraining...');
-        await this.runAutoPretraining();
-    }
-
-    private showPretrainingScreen(): void {
-        const container = document.getElementById('canvas-container');
-        if (container) {
-            container.innerHTML = `
-                <div style="
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    padding: 40px;
-                    border-radius: 10px;
-                    text-align: center;
-                    color: white;
-                    min-height: 400px;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                ">
-                    <h2 style="margin-bottom: 20px;">🧠 Neural Network Initialization</h2>
-                    <p style="font-size: 1.1em; margin-bottom: 30px;">
-                        Preparing the neural network with basic object knowledge...
-                    </p>
-                    <div id="pretraining-status" style="
-                        background: rgba(255,255,255,0.1);
-                        padding: 20px;
-                        border-radius: 5px;
-                        font-family: monospace;
-                        text-align: left;
-                        margin-bottom: 20px;
-                    ">
-                        Initializing neural network...
-                    </div>
-                    <button id="skip-pretraining" style="
-                        background: rgba(255,255,255,0.2);
-                        border: none;
-                        color: white;
-                        padding: 10px 20px;
-                        border-radius: 5px;
-                        cursor: pointer;
-                        margin-top: 10px;
-                    " onclick="window.skipPretraining()">
-                        Skip Pretraining (Start with Empty Network)
-                    </button>
-                </div>
-            `;
-        }
-        
-        // Add skip function to window
-        (window as any).skipPretraining = () => {
-            this.completePretraining();
-        };
-    }
-
-    private updatePretrainingStatus(message: string): void {
-        const statusElement = document.getElementById('pretraining-status');
-        if (statusElement) {
-            statusElement.textContent += message + '\n';
-            statusElement.scrollTop = statusElement.scrollHeight;
-        }
-    }
-
-    private async runAutoPretraining(): Promise<void> {
-        try {
-            this.updatePretrainingStatus('📊 Generating synthetic training data...');
-            
-            // Create static objects for pretraining
-            const staticObjects = [
-                new Circle(200, 150, 60),
-                new Square(600, 200, 80),
-                new Diamond(400, 450, 70)
-            ];
-            
-            // Wait a bit for visual feedback
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            this.updatePretrainingStatus('🎯 Training network to be interested in objects...');
-            
-            // Run pretraining
-            await this.neuralNetwork.pretrainObjectInterest(this.canvasWidth, this.canvasHeight, staticObjects);
-            
-            // Mark as ready
-            this.neuralNetwork.markAsReady();
-            
-            this.updatePretrainingStatus('✅ Pretraining completed successfully!');
-            this.updatePretrainingStatus('🎮 Starting main application...');
-            
-            // Wait a bit before transitioning
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // Complete pretraining and start main app
-            this.completePretraining();
-            
-        } catch (error) {
-            console.error('Pretraining failed:', error);
-            this.updatePretrainingStatus(`❌ Pretraining failed: ${error}`);
-            this.updatePretrainingStatus('🔄 Starting with empty network...');
-            
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            this.completePretraining();
-        }
+        // Start directly with the main application (no automatic pretraining)
+        this.completePretraining();
     }
 
     private completePretraining(): void {

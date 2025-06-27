@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Shaping Lab - Neural Network Pretraining</title>
     <style>
         body {
@@ -128,11 +131,17 @@ Ready to start pretraining...
     <!-- TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
     
-    <!-- Our compiled JavaScript -->
-    <script src="types.js"></script>
-    <script src="StaticObjects.js"></script>
-    <script src="NeuralNetwork.js"></script>
-    <script src="pretrain.js"></script>
+    <!-- Our compiled JavaScript with cache busting -->
+    <script>
+        // Cache busting for development - append timestamp to script URLs
+        const timestamp = Date.now();
+        const scripts = ['types.js', 'StaticObjects.js', 'NeuralNetwork.js', 'pretrain.js'];
+        scripts.forEach(scriptName => {
+            const script = document.createElement('script');
+            script.src = `${scriptName}?v=${timestamp}`;
+            document.head.appendChild(script);
+        });
+    </script>
 
     <script>
         async function startPretraining() {

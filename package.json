@@ -5,7 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc && cp dist/*.js public/",
-    "dev": "npm run build && http-server public -p 3000 -o",
+    "dev": "npm run build && http-server public -p 3000 -o -c-1",  
     "start": "http-server public -p 3000 -o",
     "watch": "tsc --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
