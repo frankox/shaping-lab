@@ -154,21 +154,23 @@ export class NeuralNetwork {
     /**
      * Create a copy of the current model for background training
      * This enables double-buffering: train on copy, swap when done
+     * Using manual architecture recreation (most reliable for TensorFlow.js 4.10.0)
      */
     private async createModelCopy(): Promise<any> {
         try {
-            // Create a new model with the same architecture as the original
             const tf = (window as any).tf;
+            
+            // Create a new model with the same architecture
             const newModel = tf.sequential({
                 layers: [
                     // Input layer: 19 features (comprehensive spatial awareness)
                     tf.layers.dense({
                         inputShape: [19],
-                        units: 96, // Increased capacity for more complex learning
+                        units: 96,
                         activation: 'relu',
                         kernelInitializer: 'heNormal',
                         useBias: true,
-                        name: 'spatial_intelligence'
+                        name: 'enhanced_spatial_awareness'
                     }),
                     // Enhanced dropout for robustness
                     tf.layers.dropout({
@@ -209,14 +211,14 @@ export class NeuralNetwork {
                     // Output layer: Pure neural movement control
                     tf.layers.dense({
                         units: 2,
-                        activation: 'tanh', // Normalized output [-1, 1]
+                        activation: 'tanh',
                         kernelInitializer: 'glorotNormal',
                         name: 'autonomous_movement'
                     })
                 ]
             });
 
-            // Compile the new model with the same configuration
+            // Compile the new model with the same configuration as the original
             newModel.compile({
                 optimizer: tf.train.adam(0.003),
                 loss: 'meanSquaredError',
@@ -227,10 +229,9 @@ export class NeuralNetwork {
             const currentWeights = this.model.getWeights();
             newModel.setWeights(currentWeights);
             
-            // Clean up the temporary weight tensors
-            currentWeights.forEach((w: any) => w.dispose());
-            
+            console.log('✅ Model cloned using manual architecture method (TF.js 4.10.0 compatible)');
             return newModel;
+            
         } catch (error) {
             console.error('❌ Failed to create model copy:', error);
             throw error;
@@ -243,14 +244,25 @@ export class NeuralNetwork {
      */
     private swapModels(): void {
         if (this.trainingModel) {
-            // Dispose of the old active model to free memory
-            this.model.dispose();
-            
-            // Atomically switch to the newly trained model
-            this.model = this.trainingModel;
-            this.trainingModel = null;
-            
-            console.log('🔄 Model swap completed - new training applied!');
+            try {
+                // Dispose of the old active model to free memory
+                if (this.model && !this.model.isDisposed) {
+                    this.model.dispose();
+                }
+                
+                // Atomically switch to the newly trained model
+                this.model = this.trainingModel;
+                this.trainingModel = null;
+                
+                console.log('🔄 Model swap completed - new training applied!');
+            } catch (error) {
+                console.error('❌ Error during model swap:', error);
+                // If swap fails, keep the original model and dispose the training model
+                if (this.trainingModel && !this.trainingModel.isDisposed) {
+                    this.trainingModel.dispose();
+                }
+                this.trainingModel = null;
+            }
         }
     }
 
@@ -333,26 +345,37 @@ export class NeuralNetwork {
      * NO ARTIFICIAL ASSISTANCE - Complete autonomous control
      */
     public async predict(state: number[]): Promise<{dx: number, dy: number}> {
-        const inputTensor = (window as any).tf.tensor2d([state], [1, 19]);
-        const prediction = this.model.predict(inputTensor) as any;
-        const output = await prediction.data();
-        
-        // Clean up tensors
-        inputTensor.dispose();
-        prediction.dispose();
+        try {
+            // Check if model is available and not disposed
+            if (!this.model || this.model.isDisposed) {
+                console.warn('⚠️ Model not available for prediction, using fallback');
+                return { dx: 0, dy: 0 };
+            }
 
-        // PURE NEURAL NETWORK OUTPUT - No artificial scaling or biases
-        // The network learns to output appropriate movement values through training
-        const autonomousMovementScale = 4.5; // Sufficient range for effective movement
-        
-        const neuralDx = output[0] * autonomousMovementScale;
-        const neuralDy = output[1] * autonomousMovementScale;
-        
-        // Only basic physics constraints to prevent simulation breaking
-        return {
-            dx: Math.max(-5.0, Math.min(5.0, neuralDx)),
-            dy: Math.max(-5.0, Math.min(5.0, neuralDy))
-        };
+            const inputTensor = (window as any).tf.tensor2d([state], [1, 19]);
+            const prediction = this.model.predict(inputTensor) as any;
+            const output = await prediction.data();
+            
+            // Clean up tensors
+            inputTensor.dispose();
+            prediction.dispose();
+
+            // PURE NEURAL NETWORK OUTPUT - No artificial scaling or biases
+            // The network learns to output appropriate movement values through training
+            const autonomousMovementScale = 4.5; // Sufficient range for effective movement
+            
+            const neuralDx = output[0] * autonomousMovementScale;
+            const neuralDy = output[1] * autonomousMovementScale;
+            
+            // Only basic physics constraints to prevent simulation breaking
+            return {
+                dx: Math.max(-5.0, Math.min(5.0, neuralDx)),
+                dy: Math.max(-5.0, Math.min(5.0, neuralDy))
+            };
+        } catch (error) {
+            console.error('Neural network prediction failed, minimal fallback:', error);
+            return { dx: 0, dy: 0 };
+        }
     }
 
     /**

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TensorFlow.js Model Clone Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+</head>
+<body>
+    <h1>TensorFlow.js Model Clone Test</h1>
+    <div id="output"></div>
+
+    <script>
+        async function testModelClone() {
+            const output = document.getElementById('output');
+            
+            try {
+                // Create a simple model for testing
+                const originalModel = tf.sequential({
+                    layers: [
+                        tf.layers.dense({
+                            inputShape: [5],
+                            units: 10,
+                            activation: 'relu'
+                        }),
+                        tf.layers.dense({
+                            units: 2,
+                            activation: 'tanh'
+                        })
+                    ]
+                });
+
+                originalModel.compile({
+                    optimizer: tf.train.adam(0.001),
+                    loss: 'meanSquaredError',
+                    metrics: ['mse']
+                });
+
+                output.innerHTML += '<p>✅ Original model created successfully</p>';
+
+                // Test Method 1: Serialization/Deserialization (TF.js 4.10.0 method)
+                try {
+                    const modelConfig = originalModel.toJSON();
+                    const weights = originalModel.getWeights();
+                    
+                    const clonedModel = await tf.models.modelFromJSON(modelConfig);
+                    clonedModel.setWeights(weights);
+                    
+                    clonedModel.compile({
+                        optimizer: tf.train.adam(0.001),
+                        loss: 'meanSquaredError',
+                        metrics: ['mse']
+                    });
+
+                    output.innerHTML += '<p>✅ Method 1 (Serialization): Model cloned successfully!</p>';
+
+                    // Test predictions to verify the clone works
+                    const testInput = tf.randomNormal([1, 5]);
+                    const originalPrediction = originalModel.predict(testInput);
+                    const clonedPrediction = clonedModel.predict(testInput);
+
+                    const originalData = await originalPrediction.data();
+                    const clonedData = await clonedPrediction.data();
+
+                    output.innerHTML += `<p>Original prediction: [${originalData[0].toFixed(4)}, ${originalData[1].toFixed(4)}]</p>`;
+                    output.innerHTML += `<p>Cloned prediction: [${clonedData[0].toFixed(4)}, ${clonedData[1].toFixed(4)}]</p>`;
+
+                    // Check if predictions are identical (they should be)
+                    const difference = Math.abs(originalData[0] - clonedData[0]) + Math.abs(originalData[1] - clonedData[1]);
+                    if (difference < 1e-6) {
+                        output.innerHTML += '<p>✅ Predictions match! Clone is working correctly.</p>';
+                    } else {
+                        output.innerHTML += '<p>❌ Predictions differ! Something went wrong with cloning.</p>';
+                    }
+
+                    // Cleanup
+                    testInput.dispose();
+                    originalPrediction.dispose();
+                    clonedPrediction.dispose();
+                    clonedModel.dispose();
+
+                } catch (serializationError) {
+                    output.innerHTML += `<p>❌ Method 1 (Serialization) failed: ${serializationError.message}</p>`;
+                }
+
+                // Cleanup
+                originalModel.dispose();
+                output.innerHTML += '<p>🧹 Memory cleaned up</p>';
+
+            } catch (error) {
+                output.innerHTML += `<p>❌ Test failed: ${error.message}</p>`;
+                console.error('Test error:', error);
+            }
+        }
+
+        // Run the test when the page loads
+        window.addEventListener('load', testModelClone);
+    </script>
+</body>
+</html>
