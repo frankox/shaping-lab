@@ -12,6 +12,7 @@ export class Environment {
     private neuralNetwork: NeuralNetwork;
     private isPretraining: boolean;
     private canvasInitialized: boolean;
+    private isLoading: boolean;
 
     constructor() {
         this.canvasWidth = 800;
@@ -20,6 +21,7 @@ export class Environment {
         this.neuralNetwork = new NeuralNetwork();
         this.isPretraining = false;
         this.canvasInitialized = false;
+        this.isLoading = true;
         
         // Check if we have a pretrained network from the pretraining page
         if ((window as any).pretrainedNetwork) {
@@ -36,10 +38,43 @@ export class Environment {
         this.setupCanvas();
         this.createObjects();
         
+        // Wait for neural network to be fully ready
+        this.waitForNeuralNetwork();
+        
         // Delay control setup to ensure DOM is ready
         setTimeout(() => {
             this.setupControlButtons();
         }, 100);
+    }
+
+    private async waitForNeuralNetwork(): Promise<void> {
+        // Give the neural network a moment to fully initialize
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Mark neural network as ready
+        this.neuralNetwork.markAsReady();
+        
+        // Start agent movement now that neural network is ready
+        if (this.agent) {
+            this.agent.startMovement();
+        }
+        
+        // Wait a bit more to ensure stability
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Neural network is ready, stop loading
+        this.isLoading = false;
+        
+        console.log('🎮 Environment fully initialized! Neural network is ready.');
+        
+        // Hide loading UI
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 300);
+        }
     }
 
     private setupCanvas(): void {
@@ -74,6 +109,42 @@ export class Environment {
             isReady: this.neuralNetwork.isNetworkReady(),
             trainingDataSize: this.neuralNetwork.getStats().dataSize
         });
+    }
+
+    private drawLoadingOverlay(): void {
+        if (!this.isLoading) return;
+        
+        // Semi-transparent overlay
+        fill(0, 0, 0, 150);
+        noStroke();
+        rect(0, 0, this.canvasWidth, this.canvasHeight);
+        
+        // Loading spinner and text
+        const centerX = this.canvasWidth / 2;
+        const centerY = this.canvasHeight / 2;
+        
+        // Spinner
+        const spinnerRadius = 30;
+        const time = Date.now() * 0.003;
+        stroke(255);
+        strokeWeight(4);
+        (window as any).noFill();
+        
+        // Draw spinning arc
+        const arcLength = Math.PI * 1.5;
+        const rotation = time % (Math.PI * 2);
+        (window as any).arc(centerX, centerY, spinnerRadius * 2, spinnerRadius * 2, rotation, rotation + arcLength);
+        
+        // Loading text
+        fill(255);
+        noStroke();
+        (window as any).textAlign((window as any).CENTER, (window as any).CENTER);
+        textSize(20);
+        text('Setting up Neural Network...', centerX, centerY + 60);
+        
+        textSize(14);
+        fill(255, 255, 255, 180);
+        text('Please wait while the environment initializes', centerX, centerY + 85);
     }
 
     private setupControlButtons(): void {
@@ -208,12 +279,19 @@ export class Environment {
             obj.draw();
         }
         
-        // Update and draw agent last (on top of everything)
-        this.agent.update();
+        // Update and draw agent only if not loading
+        if (!this.isLoading) {
+            this.agent.update();
+        }
         this.agent.draw();
         
-        // Draw UI on top of everything
-        this.drawUI();
+        // Draw loading overlay on top if still loading
+        if (this.isLoading) {
+            this.drawLoadingOverlay();
+        } else {
+            // Draw UI on top of everything only when not loading
+            this.drawUI();
+        }
     }
 }
 

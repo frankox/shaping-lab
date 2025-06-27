@@ -20,7 +20,7 @@ export class Agent implements Drawable {
 
     constructor(x: number, y: number, canvasWidth: number, canvasHeight: number, neuralNetwork: NeuralNetwork) {
         this.position = { x, y };
-        this.velocity = { dx: 0, dy: 0 };
+        this.velocity = { dx: 0, dy: 0 }; // Start with no movement
         this.size = 12;
         this.color = '#ff4757';
         this.canvasWidth = canvasWidth;
@@ -35,13 +35,25 @@ export class Agent implements Drawable {
         this.predictionInterval = 400; // Reduced frequency for better performance
         this.isUpdatingVelocity = false;
         
-        const initialMovement = this.generateSmoothMovement();
-        this.velocity.dx = initialMovement.dx;
-        this.velocity.dy = initialMovement.dy;
+        // Only initialize movement if neural network is ready
+        if (this.neuralNetwork.isNetworkReady()) {
+            const initialMovement = this.generateSmoothMovement();
+            this.velocity.dx = initialMovement.dx;
+            this.velocity.dy = initialMovement.dy;
+        }
     }
 
     public setStaticObjects(objects: Array<{position: Position, getSize?: () => number, getType?: () => string, getBoundingRadius?: () => number}>): void {
         this.staticObjects = objects;
+    }
+
+    public startMovement(): void {
+        if (this.neuralNetwork.isNetworkReady() && this.velocity.dx === 0 && this.velocity.dy === 0) {
+            const initialMovement = this.generateSmoothMovement();
+            this.velocity.dx = initialMovement.dx;
+            this.velocity.dy = initialMovement.dy;
+            console.log('🚀 Agent movement started - neural network is ready!');
+        }
     }
 
     // Movement generation
@@ -186,6 +198,11 @@ export class Agent implements Drawable {
 
     // Main update loop - PURE NEURAL NETWORK CONTROL
     public update(): void {
+        // Don't update movement if neural network is not ready
+        if (!this.neuralNetwork.isNetworkReady()) {
+            return;
+        }
+        
         const now = Date.now();
         
         // More frequent neural network updates for responsive intelligence
@@ -233,30 +250,58 @@ export class Agent implements Drawable {
 
     // Rendering
     public draw(): void {
-        for (let i = 0; i < this.trail.length; i++) {
-            const alpha = (i / this.trail.length) * 120;
-            fill(255, 71, 87, alpha);
-            noStroke();
-            const trailSize = this.size * (i / this.trail.length) * 0.8;
-            circle(this.trail[i].x, this.trail[i].y, trailSize);
+        // Draw trail only if neural network is ready
+        if (this.neuralNetwork.isNetworkReady()) {
+            for (let i = 0; i < this.trail.length; i++) {
+                const alpha = (i / this.trail.length) * 120;
+                fill(255, 71, 87, alpha);
+                noStroke();
+                const trailSize = this.size * (i / this.trail.length) * 0.8;
+                circle(this.trail[i].x, this.trail[i].y, trailSize);
+            }
         }
 
-        fill(this.color);
-        stroke(255);
-        strokeWeight(2);
+        // Draw agent body
+        if (this.neuralNetwork.isNetworkReady()) {
+            // Normal agent appearance when ready
+            fill(this.color);
+            stroke(255);
+            strokeWeight(2);
+        } else {
+            // Dimmed appearance when not ready
+            fill(100, 100, 100, 150);
+            stroke(150);
+            strokeWeight(2);
+        }
         
-        const arrowLength = 15;
-        const angle = Math.atan2(this.velocity.dy, this.velocity.dx);
-        const arrowX = this.position.x + Math.cos(angle) * arrowLength;
-        const arrowY = this.position.y + Math.sin(angle) * arrowLength;
+        circle(this.position.x, this.position.y, this.size * 2);
         
-        stroke(0, 0, 0, 100);
-        strokeWeight(5);
-        line(this.position.x + 1, this.position.y + 1, arrowX + 1, arrowY + 1);
+        // Draw directional arrow only if neural network is ready and moving
+        if (this.neuralNetwork.isNetworkReady() && (this.velocity.dx !== 0 || this.velocity.dy !== 0)) {
+            const arrowLength = 15;
+            const angle = Math.atan2(this.velocity.dy, this.velocity.dx);
+            const arrowX = this.position.x + Math.cos(angle) * arrowLength;
+            const arrowY = this.position.y + Math.sin(angle) * arrowLength;
+            
+            stroke(0, 0, 0, 100);
+            strokeWeight(5);
+            line(this.position.x + 1, this.position.y + 1, arrowX + 1, arrowY + 1);
+            
+            stroke(255);
+            strokeWeight(3);
+            line(this.position.x, this.position.y, arrowX, arrowY);
+        }
         
-        stroke(255);
-        strokeWeight(3);
-        line(this.position.x, this.position.y, arrowX, arrowY);
+        // Draw loading indicator when not ready
+        if (!this.neuralNetwork.isNetworkReady()) {
+            const time = Date.now() * 0.005;
+            const pulseSize = this.size + Math.sin(time) * 3;
+            
+            (window as any).noFill();
+            stroke(255, 255, 255, 100);
+            strokeWeight(1);
+            circle(this.position.x, this.position.y, pulseSize * 2.5);
+        }
     }
 
     // Training methods

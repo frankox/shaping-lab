@@ -27,6 +27,7 @@ export class NeuralNetwork {
     private rewardTimeoutDuration: number; // 10 seconds timeout
     private memoryCheckInterval: number; // How often to check for timeouts
     private lastMemoryCheck: number; // Last time we checked memory
+    private lastTimeoutPunishment: number; // Last time timeout punishment was given
     
     // NON-BLOCKING TRAINING SYSTEM
     private trainingQueued: boolean; // Whether training is queued for next idle moment
@@ -51,6 +52,7 @@ export class NeuralNetwork {
         this.rewardTimeoutDuration = 10000; // 10 seconds
         this.memoryCheckInterval = 1000; // Check every 1 second (less frequent)
         this.lastMemoryCheck = Date.now();
+        this.lastTimeoutPunishment = Date.now();
         
         // Initialize non-blocking training system
         this.trainingQueued = false;
@@ -848,6 +850,7 @@ export class NeuralNetwork {
     giveManualReward(intensity: number = 0.8): void {
         const now = Date.now();
         this.lastRewardTime = now;
+        this.lastTimeoutPunishment = now; // Reset timeout punishment timer
         
         // Convert recent temporal memory entries to positive training examples with temporal weighting
         const recentActions = this.temporalMemory.filter(
@@ -899,6 +902,7 @@ export class NeuralNetwork {
     giveManualPunishment(intensity: number = 0.6): void {
         const now = Date.now();
         this.lastRewardTime = now; // Update last reward time to reset timeout
+        this.lastTimeoutPunishment = now; // Reset timeout punishment timer
         
         // Convert recent temporal memory entries to negative training examples with temporal weighting
         const recentActions = this.temporalMemory.filter(
@@ -956,14 +960,24 @@ export class NeuralNetwork {
         
         this.lastMemoryCheck = now;
         
+        // Only apply timeout punishment every 10 seconds, not on every check
+        if (now - this.lastTimeoutPunishment < this.rewardTimeoutDuration) {
+            return;
+        }
+        
         // Find actions that are older than timeout and haven't been rewarded
+        // Only consider actions that occurred after the last manual reward or timeout punishment
+        const cutoffTime = Math.max(this.lastRewardTime, this.lastTimeoutPunishment);
         const timeoutActions = this.temporalMemory.filter(
             entry => now - entry.timestamp > this.rewardTimeoutDuration &&
-                    entry.timestamp > this.lastRewardTime
+                    entry.timestamp > cutoffTime
         );
         
         if (timeoutActions.length > 0) {
             console.log(`⏰ Timeout reached! Assigning neutral feedback (reward=0) to ${timeoutActions.length} unrewarded actions`);
+            
+            // Update the last timeout punishment time to prevent repeated punishment
+            this.lastTimeoutPunishment = now;
             
             // Assign neutral rewards (0) to timed-out actions - all actions get same weight
             timeoutActions.forEach(entry => {
