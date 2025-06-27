@@ -25,6 +25,8 @@ This is an interactive web application built with TypeScript and p5.js that simu
 - Prioritize atomic, self-contained changes to minimize errors and maximize reliability.
 - Validate changes by checking for errors after each edit, and resolve them if possible before proceeding.
 - Keep this file updated with any new workflow, architecture, or process changes that impact agent efficiency.
+- If you get stuck or need clarification, ask specific questions rather than making assumptions.
+- If you get an authentication error in an npm command, try running it with the --registry flag, e.g., `npm install --registry=https://registry.npmjs.org/`.
 
 ## Copilot Chat Instructions
 - When describing changes, be minimal and precise.
