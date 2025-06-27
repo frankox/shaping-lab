@@ -245,11 +245,12 @@ export class Environment {
     private drawUI(): void {
         // Draw neural network stats
         const stats = this.agent.getNeuralNetworkStats();
+        const memoryStatus = this.agent.getTemporalMemoryStatus();
         
         // Background for stats
         fill(255, 255, 255, 200);
         noStroke();
-        rect(10, 10, 250, 100, 10);
+        rect(10, 10, 300, 140, 10);
         
         // Text
         fill(0);
@@ -259,9 +260,24 @@ export class Environment {
         text(`Training Data: ${stats.dataSize} examples`, 20, 50);
         text(`Neural Network: ${stats.isTraining ? 'Training...' : 'Ready'}`, 20, 70);
         
+        // Temporal memory status
+        text(`Memory Buffer: ${memoryStatus.bufferSize} states`, 20, 90);
+        
+        // Time since last training and countdown to neutral feedback
+        const timeSinceLastTraining = Math.round(memoryStatus.timeSinceLastTraining / 1000);
+        const timeToNeutralFeedback = Math.max(0, 10 - timeSinceLastTraining);
+        
+        if (timeToNeutralFeedback > 0) {
+            fill(255, 140, 0); // Orange color for countdown
+            text(`Next neutral feedback in: ${timeToNeutralFeedback}s`, 20, 110);
+        } else {
+            fill(0, 200, 0); // Green color when ready
+            text(`Ready for neutral feedback`, 20, 110);
+        }
+        
         if (stats.lastTraining > 0) {
-            const timeSince = Math.round((Date.now() - stats.lastTraining) / 1000);
-            text(`Last Training: ${timeSince}s ago`, 20, 90);
+            fill(0);
+            text(`Last Training: ${timeSinceLastTraining}s ago`, 20, 130);
         }
     }
 

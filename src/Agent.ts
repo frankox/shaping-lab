@@ -349,4 +349,8 @@ export class Agent implements Drawable {
     public getNeuralNetworkStats(): {dataSize: number, isTraining: boolean, lastTraining: number} {
         return this.neuralNetwork.getStats();
     }
+
+    public getTemporalMemoryStatus(): { bufferSize: number; oldestEntryAge: number; timeSinceLastTraining: number } {
+        return this.neuralNetwork.getTemporalMemoryStatus();
+    }
 }

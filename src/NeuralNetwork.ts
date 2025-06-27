@@ -21,18 +21,16 @@ export class NeuralNetwork {
     private lastTrainingTime: number;
     private isReady: boolean; // Whether the network is ready for use (after pretraining)
     
-    // TEMPORAL MEMORY SYSTEM for automatic reward/punishment
+    // TEMPORAL MEMORY SYSTEM for automatic neutral feedback
     private temporalMemory: MemoryEntry[]; // Buffer of recent actions
-    private lastRewardTime: number; // When the last manual reward was given
-    private rewardTimeoutDuration: number; // 10 seconds timeout
+    private lastTrainingEvent: number; // When the last training event occurred (reward, punishment, or neutral)
+    private neutralFeedbackDuration: number; // 10 seconds timeout for neutral feedback
     private memoryCheckInterval: number; // How often to check for timeouts
     private lastMemoryCheck: number; // Last time we checked memory
-    private lastTimeoutPunishment: number; // Last time timeout punishment was given
     
     // NON-BLOCKING TRAINING SYSTEM
     private trainingQueued: boolean; // Whether training is queued for next idle moment
     private trainingTimeout: any; // Timeout ID for scheduled training
-    private clearDataAfterTraining: boolean; // Whether to clear training data after next training session
     
     // DATA RATE LIMITING - 10 entries per second
     private lastDataRecordTime: number; // Last time data was recorded
@@ -46,18 +44,16 @@ export class NeuralNetwork {
         this.lastTrainingTime = 0;
         this.isReady = false; // Start as not ready until pretraining is complete
         
-        // Initialize temporal memory system for automatic reward/punishment
+        // Initialize temporal memory system for automatic neutral feedback
         this.temporalMemory = [];
-        this.lastRewardTime = Date.now();
-        this.rewardTimeoutDuration = 10000; // 10 seconds
-        this.memoryCheckInterval = 1000; // Check every 1 second (less frequent)
+        this.lastTrainingEvent = Date.now();
+        this.neutralFeedbackDuration = 10000; // 10 seconds
+        this.memoryCheckInterval = 1000; // Check every 1 second
         this.lastMemoryCheck = Date.now();
-        this.lastTimeoutPunishment = Date.now();
         
         // Initialize non-blocking training system
         this.trainingQueued = false;
         this.trainingTimeout = null;
-        this.clearDataAfterTraining = false;
         
         // Initialize training model as null (will be created when needed)
         this.trainingModel = null;
@@ -474,21 +470,33 @@ export class NeuralNetwork {
     }
 
     /**
-     * Schedule training with current data, then clear it afterwards
-     * This ensures training data resets to 0 after each manual intervention
+     * Clear ALL training data after a training session
+     * This ensures states are never processed multiple times
      */
-    private clearTrainingDataAfterReward(): void {
-        const currentDataSize = this.trainingData.length;
+    private clearAllTrainingData(): void {
+        const clearedCount = this.trainingData.length;
+        this.trainingData = [];
+        console.log(`🧹 Training data cleared! Removed ${clearedCount} examples to prevent duplicate processing`);
+    }
+
+    /**
+     * Clear ALL temporal memory states that have been processed
+     * This ensures states are never processed multiple times
+     */
+    private clearProcessedTemporalMemory(processedStates: MemoryEntry[]): void {
+        const originalSize = this.temporalMemory.length;
         
-        if (currentDataSize >= 3) {
-            console.log(`🔄 Will train with ${currentDataSize} examples, then clear data...`);
-            // Set flag to clear data after training completes
-            this.clearDataAfterTraining = true;
-        } else {
-            // Not enough data to train, just clear immediately
-            this.trainingData = [];
-            console.log(`🧹 Training data cleared! Reset to 0 examples (insufficient data for training)`);
-        }
+        // Remove all processed states from temporal memory
+        this.temporalMemory = this.temporalMemory.filter(
+            entry => !processedStates.some(processed => 
+                processed.timestamp === entry.timestamp &&
+                processed.state.length === entry.state.length &&
+                processed.state.every((val, idx) => Math.abs(val - entry.state[idx]) < 0.0001)
+            )
+        );
+        
+        const removedCount = originalSize - this.temporalMemory.length;
+        console.log(`🧹 Removed ${removedCount} processed states from temporal memory. Remaining: ${this.temporalMemory.length}`);
     }
 
     /**
@@ -619,12 +627,9 @@ export class NeuralNetwork {
         } finally {
             this.isTraining = false;
             
-            // Clear training data if requested after manual reward/punishment
-            if (this.clearDataAfterTraining) {
-                this.trainingData = [];
-                this.clearDataAfterTraining = false;
-                console.log(`🧹 Training data cleared! Reset to 0 examples after manual reward/punishment`);
-            }
+            // ALWAYS clear training data after any training session
+            // This ensures states are never processed multiple times
+            this.clearAllTrainingData();
         }
     }
 
@@ -849,21 +854,23 @@ export class NeuralNetwork {
      */
     giveManualReward(intensity: number = 0.8): void {
         const now = Date.now();
-        this.lastRewardTime = now;
-        this.lastTimeoutPunishment = now; // Reset timeout punishment timer
         
-        // Convert recent temporal memory entries to positive training examples with temporal weighting
-        const recentActions = this.temporalMemory.filter(
-            entry => now - entry.timestamp < this.rewardTimeoutDuration
+        // Update last training event time (resets 10-second timer)
+        this.lastTrainingEvent = now;
+        console.log(`🎉 MANUAL REWARD given! 10-second neutral feedback timer RESET.`);
+        
+        // Get all states from temporal memory since the last training event
+        const statesToProcess = this.temporalMemory.filter(
+            entry => entry.timestamp >= this.lastTrainingEvent - this.neutralFeedbackDuration
         );
         
-        console.log(`🎉 Manual reward given! Converting ${recentActions.length} recent actions to temporally weighted positive examples`);
+        console.log(`   Converting ${statesToProcess.length} recent actions to temporally weighted positive examples`);
         
-        recentActions.forEach(entry => {
+        statesToProcess.forEach(entry => {
             // Calculate temporal weight: more recent actions get higher rewards
             const actionAge = now - entry.timestamp;
-            const normalizedAge = actionAge / this.rewardTimeoutDuration; // 0 = most recent, 1 = oldest
-            const temporalWeight = 1.0 - normalizedAge; // 1.0 = most recent, 0.0 = oldest
+            const normalizedAge = actionAge / this.neutralFeedbackDuration; // 0 = most recent, 1 = oldest
+            const temporalWeight = 1.0 - Math.min(normalizedAge, 1.0); // 1.0 = most recent, 0.0 = oldest
             
             // Apply temporal weighting to reward intensity
             const weightedReward = intensity * Math.max(0.1, temporalWeight); // Minimum 10% of base intensity
@@ -876,20 +883,15 @@ export class NeuralNetwork {
             };
             this.trainingData.push(trainingExample);
             
-            console.log(`  Action ${actionAge}ms ago: weight=${temporalWeight.toFixed(2)}, reward=${weightedReward.toFixed(3)}`);
+            console.log(`   Action ${actionAge}ms ago: weight=${temporalWeight.toFixed(2)}, reward=${weightedReward.toFixed(3)}`);
         });
         
-        // Clear the rewarded actions from temporal memory
-        this.temporalMemory = this.temporalMemory.filter(
-            entry => now - entry.timestamp >= this.rewardTimeoutDuration
-        );
+        // Clear the processed states from temporal memory
+        this.clearProcessedTemporalMemory(statesToProcess);
+        console.log(`   ✅ Timer reset! All processed states removed from memory.`);
         
-        // Clear training data and trigger training immediately after reward
-        this.clearTrainingDataAfterReward();
-        
-        // Trigger non-blocking training if we have enough examples and enough time has passed
-        const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
-        if (this.trainingData.length >= 5 && timeSinceLastTraining > 2000) { // Lower threshold for immediate training
+        // Trigger non-blocking training if we have enough examples
+        if (this.trainingData.length >= 5) {
             this.scheduleNonBlockingTraining();
         }
     }
@@ -901,21 +903,23 @@ export class NeuralNetwork {
      */
     giveManualPunishment(intensity: number = 0.6): void {
         const now = Date.now();
-        this.lastRewardTime = now; // Update last reward time to reset timeout
-        this.lastTimeoutPunishment = now; // Reset timeout punishment timer
         
-        // Convert recent temporal memory entries to negative training examples with temporal weighting
-        const recentActions = this.temporalMemory.filter(
-            entry => now - entry.timestamp < this.rewardTimeoutDuration
+        // Update last training event time (resets 10-second timer)
+        this.lastTrainingEvent = now;
+        console.log(`🚫 MANUAL PUNISHMENT given! 10-second neutral feedback timer RESET.`);
+        
+        // Get all states from temporal memory since the last training event
+        const statesToProcess = this.temporalMemory.filter(
+            entry => entry.timestamp >= this.lastTrainingEvent - this.neutralFeedbackDuration
         );
         
-        console.log(`🚫 Manual punishment given! Converting ${recentActions.length} recent actions to temporally weighted negative examples`);
+        console.log(`   Converting ${statesToProcess.length} recent actions to temporally weighted negative examples`);
         
-        recentActions.forEach(entry => {
+        statesToProcess.forEach(entry => {
             // Calculate temporal weight: more recent actions get stronger punishments
             const actionAge = now - entry.timestamp;
-            const normalizedAge = actionAge / this.rewardTimeoutDuration; // 0 = most recent, 1 = oldest
-            const temporalWeight = 1.0 - normalizedAge; // 1.0 = most recent, 0.0 = oldest
+            const normalizedAge = actionAge / this.neutralFeedbackDuration; // 0 = most recent, 1 = oldest
+            const temporalWeight = 1.0 - Math.min(normalizedAge, 1.0); // 1.0 = most recent, 0.0 = oldest
             
             // Apply temporal weighting to punishment intensity (negative value)
             const weightedPunishment = -intensity * Math.max(0.1, temporalWeight); // Minimum 10% of base intensity
@@ -928,27 +932,22 @@ export class NeuralNetwork {
             };
             this.trainingData.push(trainingExample);
             
-            console.log(`  Action ${actionAge}ms ago: weight=${temporalWeight.toFixed(2)}, punishment=${weightedPunishment.toFixed(3)}`);
+            console.log(`   Action ${actionAge}ms ago: weight=${temporalWeight.toFixed(2)}, punishment=${weightedPunishment.toFixed(3)}`);
         });
         
-        // Clear the punished actions from temporal memory
-        this.temporalMemory = this.temporalMemory.filter(
-            entry => now - entry.timestamp >= this.rewardTimeoutDuration
-        );
+        // Clear the processed states from temporal memory
+        this.clearProcessedTemporalMemory(statesToProcess);
+        console.log(`   ✅ Timer reset! All processed states removed from memory.`);
         
-        // Clear training data and trigger training immediately after punishment
-        this.clearTrainingDataAfterReward();
-        
-        // Trigger non-blocking training if we have enough examples and enough time has passed
-        const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
-        if (this.trainingData.length >= 5 && timeSinceLastTraining > 2000) { // Lower threshold for immediate training
+        // Trigger non-blocking training if we have enough examples
+        if (this.trainingData.length >= 5) {
             this.scheduleNonBlockingTraining();
         }
     }
     
     /**
-     * Check for timeout-based automatic punishment
-     * Called periodically to assign negative rewards to old unrewarded actions
+     * Check for automatic neutral feedback after 10 seconds of inactivity
+     * Called periodically to assign neutral rewards (0) to unrewarded actions
      */
     private checkForTimeoutPunishment(): void {
         const now = Date.now();
@@ -960,27 +959,29 @@ export class NeuralNetwork {
         
         this.lastMemoryCheck = now;
         
-        // Only apply timeout punishment every 10 seconds, not on every check
-        if (now - this.lastTimeoutPunishment < this.rewardTimeoutDuration) {
-            return;
+        // Calculate time since last training event
+        const timeSinceLastTraining = now - this.lastTrainingEvent;
+        
+        // Check if 10 seconds have passed since the last training event
+        if (timeSinceLastTraining < this.neutralFeedbackDuration) {
+            return; // Not yet time for automatic neutral feedback
         }
         
-        // Find actions that are older than timeout and haven't been rewarded
-        // Only consider actions that occurred after the last manual reward or timeout punishment
-        const cutoffTime = Math.max(this.lastRewardTime, this.lastTimeoutPunishment);
-        const timeoutActions = this.temporalMemory.filter(
-            entry => now - entry.timestamp > this.rewardTimeoutDuration &&
-                    entry.timestamp > cutoffTime
+        // Find actions that occurred since the last training event and haven't been processed
+        const statesToProcess = this.temporalMemory.filter(
+            entry => entry.timestamp >= this.lastTrainingEvent
         );
         
-        if (timeoutActions.length > 0) {
-            console.log(`⏰ Timeout reached! Assigning neutral feedback (reward=0) to ${timeoutActions.length} unrewarded actions`);
+        if (statesToProcess.length > 0) {
+            console.log(`⏰ AUTO NEUTRAL FEEDBACK TRIGGERED! 10 seconds of inactivity detected.`);
+            console.log(`   Time since last training: ${timeSinceLastTraining}ms`);
+            console.log(`   Processing ${statesToProcess.length} unprocessed states with neutral feedback`);
             
-            // Update the last timeout punishment time to prevent repeated punishment
-            this.lastTimeoutPunishment = now;
+            // Update the last training event time
+            this.lastTrainingEvent = now;
             
-            // Assign neutral rewards (0) to timed-out actions - all actions get same weight
-            timeoutActions.forEach(entry => {
+            // Assign neutral rewards (0) to all unprocessed actions
+            statesToProcess.forEach(entry => {
                 const trainingExample: TrainingExample = {
                     state: [...entry.state],
                     action: [...entry.action],
@@ -990,19 +991,15 @@ export class NeuralNetwork {
                 this.trainingData.push(trainingExample);
             });
             
-            console.log(`  All ${timeoutActions.length} timeout actions assigned neutral reward (0.0)`);
+            console.log(`   ✅ All ${statesToProcess.length} states assigned neutral reward (0.0)`);
+            console.log(`   📊 Training data now has ${this.trainingData.length} examples`);
             
             // Remove the processed actions from temporal memory
-            this.temporalMemory = this.temporalMemory.filter(
-                entry => !timeoutActions.includes(entry)
-            );
+            this.clearProcessedTemporalMemory(statesToProcess);
             
-            // Clean training data after adding neutral examples
-            this.cleanTrainingData();
-            
-            // Trigger non-blocking training with the neutral examples (but less frequently)
-            const timeSinceLastTraining = Date.now() - this.lastTrainingTime;
-            if (this.trainingData.length >= 20 && timeSinceLastTraining > 3000) { // Increased threshold and added time gap
+            // Trigger non-blocking training with the neutral examples
+            if (this.trainingData.length >= 10) {
+                console.log(`   🚀 Triggering training with ${this.trainingData.length} examples (including neutral feedback)`);
                 this.scheduleNonBlockingTraining();
             }
         }
@@ -1011,7 +1008,7 @@ export class NeuralNetwork {
     /**
      * Get temporal memory status for debugging
      */
-    getTemporalMemoryStatus(): { bufferSize: number; oldestEntryAge: number; timeSinceLastReward: number } {
+    getTemporalMemoryStatus(): { bufferSize: number; oldestEntryAge: number; timeSinceLastTraining: number } {
         const now = Date.now();
         const oldestEntry = this.temporalMemory.length > 0 ? 
             Math.min(...this.temporalMemory.map(e => e.timestamp)) : now;
@@ -1019,48 +1016,8 @@ export class NeuralNetwork {
         return {
             bufferSize: this.temporalMemory.length,
             oldestEntryAge: now - oldestEntry,
-            timeSinceLastReward: now - this.lastRewardTime
+            timeSinceLastTraining: now - this.lastTrainingEvent
         };
-    }
-
-    /**
-     * Clean training data to prevent memory bloat and improve training quality
-     * Removes old entries and balances positive/negative examples
-     */
-    private cleanTrainingData(): void {
-        const now = Date.now();
-        const maxAge = 300000; // Keep data for max 5 minutes
-        const maxEntries = 200; // Maximum total entries
-        
-        // Remove old training data
-        this.trainingData = this.trainingData.filter(
-            example => now - example.timestamp < maxAge
-        );
-        
-        // If still too many entries, keep only the most recent ones
-        if (this.trainingData.length > maxEntries) {
-            this.trainingData.sort((a, b) => b.timestamp - a.timestamp);
-            this.trainingData = this.trainingData.slice(0, maxEntries);
-        }
-        
-        // Balance positive and negative examples for better learning
-        const positiveExamples = this.trainingData.filter(ex => ex.reward > 0);
-        const negativeExamples = this.trainingData.filter(ex => ex.reward <= 0);
-        
-        const maxExamplesPerType = Math.floor(maxEntries / 2);
-        
-        // Keep balanced dataset
-        const balancedPositive = positiveExamples
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, maxExamplesPerType);
-            
-        const balancedNegative = negativeExamples
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, maxExamplesPerType);
-        
-        this.trainingData = [...balancedPositive, ...balancedNegative];
-        
-        console.log(`🧹 Training data cleaned: ${this.trainingData.length} examples (${balancedPositive.length} positive, ${balancedNegative.length} negative)`);
     }
 
     /**
