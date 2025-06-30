@@ -23,6 +23,10 @@ const App = () => {
     type: 'reward' | 'punishment';
     timestamp: number;
   } | null>(null);
+  
+  // Add throttling for UI updates
+  const lastUIUpdateRef = useRef<number>(0);
+  const UI_UPDATE_INTERVAL = 100; // Update UI every 100ms
 
   // Initialize components
   useEffect(() => {
@@ -105,7 +109,7 @@ const App = () => {
   }, []);
 
   // Simulation render callback
-  const renderFrame = useCallback(async (deltaTime: number) => {
+  const renderFrame = useCallback((deltaTime: number) => {
     if (isPaused || isSettingsOpen) return;
 
     if (!agentRef.current || !neuralNetworkRef.current || !rewardManagerRef.current || !canvasManagerRef.current) {
@@ -123,17 +127,21 @@ const App = () => {
       const canvasDimensions = canvasManager.getDimensions();
       const networkInput = agent.getNetworkInput(SHAPES, canvasDimensions.width, canvasDimensions.height);
 
-      // Get neural network prediction
-      const networkOutput = await neuralNetwork.predict(networkInput);
+      // Get neural network prediction (use cached prediction for smooth rendering)
+      const networkOutput = neuralNetwork.getCachedPrediction() || { 
+        forwardSpeed: 0, 
+        rotationDirection: 0, 
+        rotationSpeed: 0 
+      };
 
       // Apply action to agent
-      agent.applyAction(networkOutput, deltaTime * 16.67); // Normalize deltaTime to ~60fps
+      agent.applyAction(networkOutput, deltaTime * 60); // Normalize to 60fps for consistent movement
       agent.constrainToCanvas(canvasDimensions.width, canvasDimensions.height);
 
       // Add state to reward manager buffer
       rewardManager.addState(currentState);
 
-      // Render everything
+      // Render everything in order for best performance
       canvasManager.renderShapes(SHAPES);
       canvasManager.renderAgent(agent);
 
@@ -154,10 +162,19 @@ const App = () => {
         isTraining: neuralNetwork.isCurrentlyTraining(),
       });
 
-      // Update UI state
-      setStateBufferSize(rewardManager.getStateBufferSize());
-      setTimeSinceLastLearning(rewardManager.getTimeSinceLastLearning());
-      setIsTraining(neuralNetwork.isCurrentlyTraining());
+      // Update neural network prediction asynchronously (don't block rendering)
+      neuralNetwork.predict(networkInput).catch(error => {
+        console.error('Neural network prediction error:', error);
+      });
+
+      // Update UI state with throttling to avoid too frequent React updates
+      const now = performance.now();
+      if (now - lastUIUpdateRef.current > UI_UPDATE_INTERVAL) {
+        setStateBufferSize(rewardManager.getStateBufferSize());
+        setTimeSinceLastLearning(rewardManager.getTimeSinceLastLearning());
+        setIsTraining(neuralNetwork.isCurrentlyTraining());
+        lastUIUpdateRef.current = now;
+      }
 
     } catch (error) {
       console.error('Simulation error:', error);

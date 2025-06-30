@@ -91,33 +91,51 @@ export class Agent {
   render(ctx: CanvasRenderingContext2D): void {
     ctx.save();
     
+    // Use sub-pixel positioning for smoother movement
+    const x = Math.round(this.position.x * 10) / 10;
+    const y = Math.round(this.position.y * 10) / 10;
+    
     // Move to agent position
-    ctx.translate(this.position.x, this.position.y);
+    ctx.translate(x, y);
     ctx.rotate(this.heading);
     
-    // Draw agent body (circle)
+    // Enable anti-aliasing
+    ctx.imageSmoothingEnabled = true;
+    
+    // Draw agent body (circle) with smooth edges
     ctx.fillStyle = this.color;
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(0, 0, this.size, 0, 2 * Math.PI);
     ctx.fill();
+    ctx.stroke();
     
     // Draw direction indicator (small triangle pointing forward)
     ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(this.size * 0.7, 0);
     ctx.lineTo(this.size * 0.3, -this.size * 0.3);
     ctx.lineTo(this.size * 0.3, this.size * 0.3);
     ctx.closePath();
     ctx.fill();
+    ctx.stroke();
     
-    // Draw velocity indicator (trail)
+    // Draw velocity indicator (trail) with alpha blending
     if (this.velocity > 0.1) {
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.5;
+      const trailLength = Math.min(this.velocity * 15, 30);
+      const gradient = ctx.createLinearGradient(0, 0, -trailLength, 0);
+      gradient.addColorStop(0, this.color + '80'); // Semi-transparent
+      gradient.addColorStop(1, this.color + '00'); // Fully transparent
+      
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(-this.size, 0);
-      ctx.lineTo(-this.size - this.velocity * 10, 0);
+      ctx.moveTo(-this.size * 0.5, 0);
+      ctx.lineTo(-trailLength, 0);
       ctx.stroke();
     }
     

@@ -7,6 +7,9 @@ export class NeuralNetworkWrapper {
   private optimizer: tf.Optimizer;
   private isTraining: boolean = false;
   private learningRate: number = 0.001;
+  private cachedPrediction: NetworkOutput | null = null;
+  private lastPredictionTime: number = 0;
+  private predictionCacheTimeout: number = 50; // Cache for 50ms
 
   constructor() {
     this.optimizer = tf.train.adam(this.learningRate);
@@ -68,14 +71,29 @@ export class NeuralNetworkWrapper {
       const rotationSpeed = (values[1] + 1) / 2; // Convert to [0, 1]
       const forwardSpeed = (values[2] + 1) / 2; // Convert to [0, 1]
 
-      return {
+      const result = {
         rotationDirection: clamp(rotationDirection, -1, 1),
         rotationSpeed: clamp(rotationSpeed, 0, 1),
         forwardSpeed: clamp(forwardSpeed, 0, 1),
       };
+
+      // Cache the prediction
+      this.cachedPrediction = result;
+      this.lastPredictionTime = performance.now();
+
+      return result;
     } finally {
       inputTensor.dispose();
     }
+  }
+
+  getCachedPrediction(): NetworkOutput | null {
+    // Return cached prediction if it's still valid
+    if (this.cachedPrediction && 
+        (performance.now() - this.lastPredictionTime) < this.predictionCacheTimeout) {
+      return this.cachedPrediction;
+    }
+    return null;
   }
 
   async trainOnExperience(

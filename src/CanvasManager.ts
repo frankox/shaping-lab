@@ -9,8 +9,6 @@ export class CanvasManager {
   private height: number;
   private isRunning: boolean = false;
   private lastFrameTime: number = 0;
-  private fps: number = 30;
-  private frameInterval: number = 1000 / this.fps;
   private animationId: number | null = null;
 
   constructor(width: number, height: number) {
@@ -30,6 +28,13 @@ export class CanvasManager {
   private setupCanvas(): void {
     this.ctx.imageSmoothingEnabled = true;
     this.ctx.imageSmoothingQuality = 'high';
+    
+    // Set up for smooth rendering
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+    
+    // Ensure pixel-perfect rendering
+    this.canvas.style.imageRendering = 'auto';
   }
 
   getCanvas(): HTMLCanvasElement {
@@ -54,16 +59,15 @@ export class CanvasManager {
     this.isRunning = true;
     this.lastFrameTime = performance.now();
     
-    const gameLoop = async (currentTime: number) => {
+    const gameLoop = (currentTime: number) => {
       if (!this.isRunning) return;
 
       const deltaTime = (currentTime - this.lastFrameTime) / 1000; // Convert to seconds
       
-      if (deltaTime >= this.frameInterval / 1000) {
-        this.clear();
-        renderCallback(deltaTime);
-        this.lastFrameTime = currentTime;
-      }
+      // Always render - let requestAnimationFrame handle the timing
+      this.clear();
+      renderCallback(deltaTime);
+      this.lastFrameTime = currentTime;
 
       this.animationId = requestAnimationFrame(gameLoop);
     };
@@ -88,11 +92,17 @@ export class CanvasManager {
   }
 
   clear(): void {
+    // Use efficient clearing method
+    this.ctx.save();
+    
+    // Clear the entire canvas
     this.ctx.clearRect(0, 0, this.width, this.height);
     
-    // Draw background
+    // Draw background efficiently
     this.ctx.fillStyle = '#f8f9fa';
     this.ctx.fillRect(0, 0, this.width, this.height);
+    
+    this.ctx.restore();
   }
 
   renderShapes(shapes: Shape[]): void {
@@ -101,14 +111,21 @@ export class CanvasManager {
 
   private renderShape(shape: Shape): void {
     this.ctx.save();
+    
+    // Use sub-pixel positioning for smoother rendering
+    const x = Math.round(shape.position.x * 10) / 10;
+    const y = Math.round(shape.position.y * 10) / 10;
+    
     this.ctx.fillStyle = shape.color;
     this.ctx.strokeStyle = '#333';
     this.ctx.lineWidth = 2;
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
 
     switch (shape.type) {
       case 'circle':
         this.ctx.beginPath();
-        this.ctx.arc(shape.position.x, shape.position.y, shape.size / 2, 0, 2 * Math.PI);
+        this.ctx.arc(x, y, shape.size / 2, 0, 2 * Math.PI);
         this.ctx.fill();
         this.ctx.stroke();
         break;
@@ -116,14 +133,14 @@ export class CanvasManager {
       case 'square':
         const halfSize = shape.size / 2;
         this.ctx.fillRect(
-          shape.position.x - halfSize,
-          shape.position.y - halfSize,
+          x - halfSize,
+          y - halfSize,
           shape.size,
           shape.size
         );
         this.ctx.strokeRect(
-          shape.position.x - halfSize,
-          shape.position.y - halfSize,
+          x - halfSize,
+          y - halfSize,
           shape.size,
           shape.size
         );
@@ -132,9 +149,9 @@ export class CanvasManager {
       case 'triangle':
         const height = shape.size * 0.866; // Equilateral triangle height
         this.ctx.beginPath();
-        this.ctx.moveTo(shape.position.x, shape.position.y - height / 2);
-        this.ctx.lineTo(shape.position.x - shape.size / 2, shape.position.y + height / 2);
-        this.ctx.lineTo(shape.position.x + shape.size / 2, shape.position.y + height / 2);
+        this.ctx.moveTo(x, y - height / 2);
+        this.ctx.lineTo(x - shape.size / 2, y + height / 2);
+        this.ctx.lineTo(x + shape.size / 2, y + height / 2);
         this.ctx.closePath();
         this.ctx.fill();
         this.ctx.stroke();
@@ -155,32 +172,54 @@ export class CanvasManager {
     isTraining?: boolean;
   }): void {
     this.ctx.save();
+    
+    // Set up text rendering for better performance
     this.ctx.fillStyle = '#333';
-    this.ctx.font = '14px Arial';
+    this.ctx.font = '14px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
     this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'top';
 
-    let y = 20;
-    const lineHeight = 20;
+    let y = 15;
+    const lineHeight = 18;
+    const padding = 8;
 
+    // Create a semi-transparent background for better readability
+    const texts = [];
     if (info.fps !== undefined) {
-      this.ctx.fillText(`FPS: ${info.fps.toFixed(1)}`, 10, y);
-      y += lineHeight;
+      texts.push(`FPS: ${info.fps.toFixed(1)}`);
     }
-
     if (info.stateBufferSize !== undefined) {
-      this.ctx.fillText(`Buffer: ${info.stateBufferSize} states`, 10, y);
-      y += lineHeight;
+      texts.push(`Buffer: ${info.stateBufferSize} states`);
     }
-
     if (info.timeSinceLastLearning !== undefined) {
       const seconds = (info.timeSinceLastLearning / 1000).toFixed(1);
-      this.ctx.fillText(`Last learning: ${seconds}s ago`, 10, y);
-      y += lineHeight;
+      texts.push(`Last learning: ${seconds}s ago`);
+    }
+    if (info.isTraining) {
+      texts.push('Training...');
     }
 
-    if (info.isTraining) {
-      this.ctx.fillStyle = '#FF5722';
-      this.ctx.fillText('Training...', 10, y);
+    if (texts.length > 0) {
+      // Draw background
+      const maxWidth = Math.max(...texts.map(text => this.ctx.measureText(text).width));
+      const bgHeight = texts.length * lineHeight + padding;
+      
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      this.ctx.fillRect(5, 5, maxWidth + padding * 2, bgHeight);
+      
+      // Draw border
+      this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+      this.ctx.lineWidth = 1;
+      this.ctx.strokeRect(5, 5, maxWidth + padding * 2, bgHeight);
+      
+      // Draw text
+      this.ctx.fillStyle = '#333';
+      texts.forEach((text, index) => {
+        if (index === texts.length - 1 && info.isTraining) {
+          this.ctx.fillStyle = '#F44336'; // Red for training indicator
+        }
+        this.ctx.fillText(text, 5 + padding, y + index * lineHeight);
+      });
     }
 
     this.ctx.restore();
