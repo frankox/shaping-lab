@@ -10,6 +10,8 @@ export class NeuralNetworkWrapper {
   private cachedPrediction: NetworkOutput | null = null;
   private lastPredictionTime: number = 0;
   private predictionCacheTimeout: number = 50; // Cache for 50ms
+  private explorationRate: number = 0.3; // Higher for more exploration
+  private step: number = 0;
 
   constructor() {
     this.optimizer = tf.train.adam(this.learningRate);
@@ -24,12 +26,16 @@ export class NeuralNetworkWrapper {
           activation: 'relu',
           inputShape: [7], // 7 input features
           kernelInitializer: 'randomNormal',
+          kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
         }),
+        tf.layers.dropout({ rate: 0.1 }),
         tf.layers.dense({
           units: 16,
           activation: 'relu',
           kernelInitializer: 'randomNormal',
+          kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
         }),
+        tf.layers.dropout({ rate: 0.1 }),
         tf.layers.dense({
           units: 8,
           activation: 'relu',
@@ -67,9 +73,21 @@ export class NeuralNetworkWrapper {
       const values = await prediction.data();
 
       // Convert tanh output [-1, 1] to desired ranges
-      const rotationDirection = values[0]; // Keep [-1, 1]
-      const rotationSpeed = (values[1] + 1) / 2; // Convert to [0, 1]
-      const forwardSpeed = (values[2] + 1) / 2; // Convert to [0, 1]
+      let rotationDirection = values[0]; // Keep [-1, 1]
+      let rotationSpeed = (values[1] + 1) / 2; // Convert to [0, 1]
+      let forwardSpeed = (values[2] + 1) / 2; // Convert to [0, 1]
+
+      // Add exploration noise that decreases over time
+      this.step++;
+      const decayRate = 0.9995; // Slow decay
+      const currentExplorationRate = this.explorationRate * Math.pow(decayRate, this.step);
+      
+      if (Math.random() < currentExplorationRate) {
+        // Add exploration noise
+        rotationDirection += (Math.random() - 0.5) * 0.4;
+        rotationSpeed = Math.random() * 0.8; // More varied rotation
+        forwardSpeed = Math.random() * 0.6; // More varied speed
+      }
 
       const result = {
         rotationDirection: clamp(rotationDirection, -1, 1),
@@ -133,16 +151,31 @@ export class NeuralNetworkWrapper {
         // Get current prediction for this state
         const currentPrediction = await this.predict(networkInput);
         
-        // Adjust the target based on reward
-        // This is a simplified approach - in a more sophisticated implementation,
-        // we might use temporal difference learning or policy gradients
-        const adjustmentFactor = reward * 0.1; // Scale down the adjustment
+        // Improved learning strategy based on reward
+        let target: number[];
         
-        const target = [
-          clamp(currentPrediction.rotationDirection + adjustmentFactor * (Math.random() - 0.5), -1, 1),
-          clamp(currentPrediction.rotationSpeed + adjustmentFactor * Math.random(), 0, 1),
-          clamp(currentPrediction.forwardSpeed + adjustmentFactor * Math.random(), 0, 1),
-        ];
+        if (reward > 0) {
+          // Positive reward: reinforce current behavior and encourage exploration
+          target = [
+            clamp(currentPrediction.rotationDirection + (Math.random() - 0.5) * 0.1, -1, 1),
+            clamp(currentPrediction.rotationSpeed + Math.random() * 0.1, 0, 1),
+            clamp(currentPrediction.forwardSpeed + Math.random() * 0.1, 0, 1),
+          ];
+        } else if (reward < 0) {
+          // Negative reward: discourage current behavior, encourage different actions
+          target = [
+            clamp(currentPrediction.rotationDirection + (Math.random() - 0.5) * 0.5, -1, 1),
+            clamp(0.3 + Math.random() * 0.6, 0, 1), // Encourage more rotation
+            clamp(Math.random() * 0.4, 0, 1), // Reduce forward speed
+          ];
+        } else {
+          // Neutral reward: encourage exploration with slight bias toward movement
+          target = [
+            clamp((Math.random() - 0.5) * 0.8, -1, 1), // More varied rotation
+            clamp(0.2 + Math.random() * 0.6, 0, 1), // Moderate rotation speed
+            clamp(0.1 + Math.random() * 0.4, 0, 1), // Slight forward bias
+          ];
+        }
 
         targets.push(target);
       }
@@ -187,7 +220,8 @@ export class NeuralNetworkWrapper {
     const distToSquare = squareShape ? distanceToShape(state.position, squareShape) / 100 : 1;
     const distToTriangle = triangleShape ? distanceToShape(state.position, triangleShape) / 100 : 1;
     
-    const normalizedHeading = state.heading / (2 * Math.PI);
+    // Use sine for heading to avoid boundary issues
+    const headingSin = Math.sin(state.heading);
     const normalizedVelocity = state.velocity / 2.0; // Assuming max speed of 2.0
 
     return {
@@ -196,7 +230,7 @@ export class NeuralNetworkWrapper {
       distToCircle: clamp(distToCircle, 0, 1),
       distToSquare: clamp(distToSquare, 0, 1),
       distToTriangle: clamp(distToTriangle, 0, 1),
-      heading: clamp(normalizedHeading, 0, 1),
+      heading: clamp((headingSin + 1) / 2, 0, 1), // Convert sin to [0,1]
       velocity: clamp(normalizedVelocity, 0, 1),
     };
   }
@@ -230,6 +264,7 @@ export class NeuralNetworkWrapper {
   resetModel(): void {
     this.model.dispose();
     this.model = this.createModel();
+    this.step = 0; // Reset exploration step
   }
 
   isCurrentlyTraining(): boolean {

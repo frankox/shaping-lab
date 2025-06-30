@@ -170,6 +170,10 @@ export class CanvasManager {
     stateBufferSize?: number;
     timeSinceLastLearning?: number;
     isTraining?: boolean;
+    agentPosition?: { x: number; y: number };
+    agentHeading?: number;
+    agentVelocity?: number;
+    networkOutput?: { rotationDirection: number; rotationSpeed: number; forwardSpeed: number };
   }): void {
     this.ctx.save();
     
@@ -197,6 +201,20 @@ export class CanvasManager {
     }
     if (info.isTraining) {
       texts.push('Training...');
+    }
+    if (info.agentPosition) {
+      texts.push(`Pos: (${info.agentPosition.x.toFixed(0)}, ${info.agentPosition.y.toFixed(0)})`);
+    }
+    if (info.agentHeading !== undefined) {
+      texts.push(`Heading: ${(info.agentHeading * 180 / Math.PI).toFixed(0)}°`);
+    }
+    if (info.agentVelocity !== undefined) {
+      texts.push(`Velocity: ${info.agentVelocity.toFixed(2)}`);
+    }
+    if (info.networkOutput) {
+      texts.push(`Rot Dir: ${info.networkOutput.rotationDirection.toFixed(2)}`);
+      texts.push(`Rot Speed: ${info.networkOutput.rotationSpeed.toFixed(2)}`);
+      texts.push(`Fwd Speed: ${info.networkOutput.forwardSpeed.toFixed(2)}`);
     }
 
     if (texts.length > 0) {

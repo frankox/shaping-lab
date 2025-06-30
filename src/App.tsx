@@ -160,6 +160,10 @@ const App = () => {
         stateBufferSize: rewardManager.getStateBufferSize(),
         timeSinceLastLearning: rewardManager.getTimeSinceLastLearning(),
         isTraining: neuralNetwork.isCurrentlyTraining(),
+        agentPosition: agent.getPosition(),
+        agentHeading: agent.getHeading(),
+        agentVelocity: agent.getVelocity(),
+        networkOutput: networkOutput,
       });
 
       // Update neural network prediction asynchronously (don't block rendering)

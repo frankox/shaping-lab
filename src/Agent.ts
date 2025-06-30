@@ -5,10 +5,11 @@ export class Agent {
   private position: Vector2D;
   private heading: number;
   private velocity: number;
-  private maxSpeed: number = 2.0;
-  private maxRotationSpeed: number = 0.1;
+  private maxSpeed: number = 0.5;
+  private maxRotationSpeed: number = 0.08; // Reduced for more observable rotation
   private size: number = 10;
   private color: string = '#E91E63';
+  private angularVelocity: number = 0; // Add angular velocity for smoother rotation
 
   constructor(
     initialPosition: Vector2D = { x: 100, y: 100 },
@@ -17,6 +18,7 @@ export class Agent {
     this.position = { ...initialPosition };
     this.heading = initialHeading;
     this.velocity = 0;
+    this.angularVelocity = 0;
   }
 
   getState(): AgentState {
@@ -48,8 +50,8 @@ export class Agent {
     const distToSquare = squareShape ? distanceToShape(this.position, squareShape) / 100 : 1;
     const distToTriangle = triangleShape ? distanceToShape(this.position, triangleShape) / 100 : 1;
     
-    // Normalize heading to [0, 1] range
-    const normalizedHeading = this.heading / (2 * Math.PI);
+    // Use sine for heading to avoid boundary issues
+    const headingSin = Math.sin(this.heading);
     
     // Normalize velocity to [0, 1] range
     const normalizedVelocity = this.velocity / this.maxSpeed;
@@ -60,22 +62,30 @@ export class Agent {
       distToCircle: clamp(distToCircle, 0, 1),
       distToSquare: clamp(distToSquare, 0, 1),
       distToTriangle: clamp(distToTriangle, 0, 1),
-      heading: clamp(normalizedHeading, 0, 1),
+      heading: clamp((headingSin + 1) / 2, 0, 1), // Convert sin to [0,1]
       velocity: clamp(normalizedVelocity, 0, 1),
     };
   }
 
   applyAction(output: NetworkOutput, deltaTime: number): void {
-    // Apply rotation
-    const rotationAmount = output.rotationDirection * output.rotationSpeed * this.maxRotationSpeed * deltaTime;
+    // Apply rotation with smoother angular velocity
+    const targetAngularVelocity = output.rotationDirection * output.rotationSpeed * this.maxRotationSpeed;
+    
+    // Smooth angular velocity interpolation for more natural movement
+    const angularDamping = 0.8;
+    this.angularVelocity = this.angularVelocity * angularDamping + targetAngularVelocity * (1 - angularDamping);
+    
+    const rotationAmount = this.angularVelocity * deltaTime * 60; // Normalize to 60fps
     this.heading = normalizeAngle(this.heading + rotationAmount);
     
-    // Apply forward movement
-    this.velocity = output.forwardSpeed * this.maxSpeed;
+    // Apply forward movement with momentum
+    const targetVelocity = output.forwardSpeed * this.maxSpeed;
+    const velocityDamping = 0.9;
+    this.velocity = this.velocity * velocityDamping + targetVelocity * (1 - velocityDamping);
     
     // Update position based on heading and velocity
-    const deltaX = Math.cos(this.heading) * this.velocity * deltaTime;
-    const deltaY = Math.sin(this.heading) * this.velocity * deltaTime;
+    const deltaX = Math.cos(this.heading) * this.velocity * deltaTime * 60;
+    const deltaY = Math.sin(this.heading) * this.velocity * deltaTime * 60;
     
     this.position.x += deltaX;
     this.position.y += deltaY;
@@ -166,5 +176,6 @@ export class Agent {
       this.heading = heading;
     }
     this.velocity = 0;
+    this.angularVelocity = 0; // Reset angular velocity
   }
 }
