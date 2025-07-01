@@ -4,6 +4,7 @@ import { CanvasManager } from './CanvasManager';
 import { NeuralNetworkWrapper } from './NeuralNetworkWrapper';
 import { RewardManager } from './RewardManager';
 import { Settings } from './components/Settings';
+import About from './components/About';
 import { AppConfig, DEFAULT_CONFIG, SHAPES, LearningEvent } from './types';
 
 const App = () => {
@@ -15,6 +16,7 @@ const App = () => {
   
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
   const [stateBufferSize, setStateBufferSize] = useState(0);
@@ -314,6 +316,19 @@ const App = () => {
           </button>
         </div>
       </div>
+
+      <button
+        className="about-btn"
+        style={{ position: 'absolute', top: 16, left: 16, zIndex: 10 }}
+        onClick={() => setIsAboutOpen(true)}
+        aria-label="About Shaping Lab"
+      >
+        About
+      </button>
+
+      {isAboutOpen && (
+        <About onClose={() => setIsAboutOpen(false)} />
+      )}
 
       <Settings
         isOpen={isSettingsOpen}
