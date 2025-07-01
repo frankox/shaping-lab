@@ -5,11 +5,11 @@ export class Agent {
   private position: Vector2D;
   private heading: number;
   private velocity: number;
-  private maxSpeed: number = 0.5;
-  private maxRotationSpeed: number = 0.08; // Reduced for more observable rotation
+  private maxSpeed: number = 0.1;
+  private maxRotationSpeed: number = 0.08; 
   private size: number = 10;
   private color: string = '#E91E63';
-  private angularVelocity: number = 0; // Add angular velocity for smoother rotation
+  private angularVelocity: number = 0;
 
   constructor(
     initialPosition: Vector2D = { x: 100, y: 100 },

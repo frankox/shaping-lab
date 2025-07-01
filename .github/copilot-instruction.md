@@ -74,7 +74,6 @@ The agent should rotate gradually, like an animal or a robot would do in a natur
 - Configurable gradient and timeframe.
 
 
-
 ### 6. Configuration Options
 
 When the settings drawer is open, the agent and the canvas must pause.
@@ -135,3 +134,5 @@ Suggestions:
 
 ###
 
+## Coding Standards
+- **comments**: comment only what strictly necessary, avoid redundant comment generation

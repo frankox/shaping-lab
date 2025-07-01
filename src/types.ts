@@ -38,12 +38,17 @@ export interface LearningEvent {
 export interface AppConfig {
   intrinsicPunishment: boolean;
   intrinsicTimeframe: number; // seconds
+  intrinsicGradientPunishmentMin: number;
+  intrinsicGradientPunishmentMax: number;
   gradientReward: boolean;
+  rewardAmount: number; // Fixed reward amount when gradient is disabled
   rewardMin: number;
   rewardMax: number;
+  manualPunishmentEnabled: boolean;
+  gradientPunishment: boolean; // Gradient toggle for manual punishment
+  punishmentAmount: number; // Fixed punishment amount when gradient is disabled
   gradientPunishmentMin: number;
   gradientPunishmentMax: number;
-  manualPunishmentEnabled: boolean;
   canvasWidth: number;
   canvasHeight: number;
 }
@@ -58,12 +63,17 @@ export interface Shape {
 export const DEFAULT_CONFIG: AppConfig = {
   intrinsicPunishment: false,
   intrinsicTimeframe: 10,
+  intrinsicGradientPunishmentMin: 0,
+  intrinsicGradientPunishmentMax: 1,
   gradientReward: false,
+  rewardAmount: 1,
   rewardMin: 0,
   rewardMax: 1,
+  manualPunishmentEnabled: false,
+  gradientPunishment: false,
+  punishmentAmount: 1,
   gradientPunishmentMin: 0,
   gradientPunishmentMax: 1,
-  manualPunishmentEnabled: false,
   canvasWidth: 800,
   canvasHeight: 600,
 };

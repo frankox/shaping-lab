@@ -34,7 +34,165 @@ export const Settings: React.FC<SettingsProps> = ({
       
       <div className="sidebar-content">
         <div className="setting-group">
-          <h3>Learning Configuration</h3>
+          <h3>Reward Configuration</h3>
+          
+          <div className="setting-item">
+            <label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                Gradient Reward
+                <div className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={config.gradientReward}
+                    onChange={(e) => handleChange('gradientReward', e.target.checked)}
+                  />
+                  <span className="slider"></span>
+                </div>
+              </div>
+            </label>
+          </div>
+          
+          {config.gradientReward ? (
+            <>
+              <div className="setting-item">
+                <label>
+                  Reward Min
+                  <span className="value-display">{config.rewardMin.toFixed(2)}</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={config.rewardMin}
+                  onChange={(e) => handleChange('rewardMin', Number(e.target.value))}
+                />
+              </div>
+
+              <div className="setting-item">
+                <label>
+                  Reward Max
+                  <span className="value-display">{config.rewardMax.toFixed(2)}</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={config.rewardMax}
+                  onChange={(e) => handleChange('rewardMax', Number(e.target.value))}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="setting-item">
+              <label>
+                Reward Amount
+                <span className="value-display">{config.rewardAmount.toFixed(2)}</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="2"
+                step="0.1"
+                value={config.rewardAmount}
+                onChange={(e) => handleChange('rewardAmount', Number(e.target.value))}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="setting-group">
+          <h3>Punishment Configuration</h3>
+          
+          <div className="setting-item">
+            <label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                Manual Punishment
+                <div className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={config.manualPunishmentEnabled}
+                    onChange={(e) => handleChange('manualPunishmentEnabled', e.target.checked)}
+                  />
+                  <span className="slider"></span>
+                </div>
+              </div>
+            </label>
+          </div>
+
+          {config.manualPunishmentEnabled && (
+            <>
+              <div className="setting-item">
+                <label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    Gradient Punishment
+                    <div className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={config.gradientPunishment}
+                        onChange={(e) => handleChange('gradientPunishment', e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+              
+              {config.gradientPunishment ? (
+                <>
+                  <div className="setting-item">
+                    <label>
+                      Punishment Min
+                      <span className="value-display">{config.gradientPunishmentMin.toFixed(2)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={config.gradientPunishmentMin}
+                      onChange={(e) => handleChange('gradientPunishmentMin', Number(e.target.value))}
+                    />
+                  </div>
+
+                  <div className="setting-item">
+                    <label>
+                      Punishment Max
+                      <span className="value-display">{config.gradientPunishmentMax.toFixed(2)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={config.gradientPunishmentMax}
+                      onChange={(e) => handleChange('gradientPunishmentMax', Number(e.target.value))}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="setting-item">
+                  <label>
+                    Punishment Amount
+                    <span className="value-display">{config.punishmentAmount.toFixed(2)}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                    value={config.punishmentAmount}
+                    onChange={(e) => handleChange('punishmentAmount', Number(e.target.value))}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="setting-group">
+          <h3>Intrinsic Punishment Configuration</h3>
           
           <div className="setting-item">
             <label>
@@ -53,121 +211,51 @@ export const Settings: React.FC<SettingsProps> = ({
           </div>
 
           {config.intrinsicPunishment && (
-            <div className="setting-item">
-              <label>
-                Intrinsic Timeframe (seconds)
-                <span className="value-display">{config.intrinsicTimeframe}</span>
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="30"
-                step="1"
-                value={config.intrinsicTimeframe}
-                onChange={(e) => handleChange('intrinsicTimeframe', Number(e.target.value))}
-              />
-            </div>
+            <>
+              <div className="setting-item">
+                <label>
+                  Intrinsic Timeframe (seconds)
+                  <span className="value-display">{config.intrinsicTimeframe}</span>
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="30"
+                  step="1"
+                  value={config.intrinsicTimeframe}
+                  onChange={(e) => handleChange('intrinsicTimeframe', Number(e.target.value))}
+                />
+              </div>
+              <div className="setting-item">
+                <label>
+                  Intrinsic Gradient Punishment Min
+                  <span className="value-display">{config.intrinsicGradientPunishmentMin.toFixed(2)}</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={config.intrinsicGradientPunishmentMin}
+                  onChange={(e) => handleChange('intrinsicGradientPunishmentMin', Number(e.target.value))}
+                />
+              </div>
+              <div className="setting-item">
+                <label>
+                  Intrinsic Gradient Punishment Max
+                  <span className="value-display">{config.intrinsicGradientPunishmentMax.toFixed(2)}</span>
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={config.intrinsicGradientPunishmentMax}
+                  onChange={(e) => handleChange('intrinsicGradientPunishmentMax', Number(e.target.value))}
+                />
+              </div>
+            </>
           )}
-
-          <div className="setting-item">
-            <label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                Gradient Reward
-                <div className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={config.gradientReward}
-                    onChange={(e) => handleChange('gradientReward', e.target.checked)}
-                  />
-                  <span className="slider"></span>
-                </div>
-              </div>
-            </label>
-          </div>
-
-          <div className="setting-item">
-            <label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                Manual Punishment
-                <div className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={config.manualPunishmentEnabled}
-                    onChange={(e) => handleChange('manualPunishmentEnabled', e.target.checked)}
-                  />
-                  <span className="slider"></span>
-                </div>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <div className="setting-group">
-          <h3>Reward Configuration</h3>
-          
-          <div className="setting-item">
-            <label>
-              Reward Min
-              <span className="value-display">{config.rewardMin.toFixed(2)}</span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={config.rewardMin}
-              onChange={(e) => handleChange('rewardMin', Number(e.target.value))}
-            />
-          </div>
-
-          <div className="setting-item">
-            <label>
-              Reward Max
-              <span className="value-display">{config.rewardMax.toFixed(2)}</span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={config.rewardMax}
-              onChange={(e) => handleChange('rewardMax', Number(e.target.value))}
-            />
-          </div>
-        </div>
-
-        <div className="setting-group">
-          <h3>Punishment Configuration</h3>
-          
-          <div className="setting-item">
-            <label>
-              Punishment Min
-              <span className="value-display">{config.gradientPunishmentMin.toFixed(2)}</span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={config.gradientPunishmentMin}
-              onChange={(e) => handleChange('gradientPunishmentMin', Number(e.target.value))}
-            />
-          </div>
-
-          <div className="setting-item">
-            <label>
-              Punishment Max
-              <span className="value-display">{config.gradientPunishmentMax.toFixed(2)}</span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="2"
-              step="0.1"
-              value={config.gradientPunishmentMax}
-              onChange={(e) => handleChange('gradientPunishmentMax', Number(e.target.value))}
-            />
-          </div>
         </div>
 
         <div className="setting-group">
