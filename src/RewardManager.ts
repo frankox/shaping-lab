@@ -24,11 +24,6 @@ export class RewardManager {
 
   addState(state: AgentState): void {
     this.stateBuffer.push({ ...state });
-    
-    // Keep buffer size reasonable (max 1000 states)
-    if (this.stateBuffer.length > 1000) {
-      this.stateBuffer = this.stateBuffer.slice(-1000);
-    }
   }
 
   applyManualReward(): void {

@@ -2,6 +2,44 @@
 
 A web-based interactive simulator for training neural network agents through shaping techniques. The agent learns to navigate a 2D environment using manual rewards/punishments and intrinsic feedback mechanisms.
 
+## What is Shaping Lab?
+
+Shaping Lab is an educational and experimental tool that demonstrates **behavioral shaping** - a machine learning technique inspired by psychology. You control a virtual environment where an AI agent (represented by a small circle) learns to behave through positive and negative feedback, just like training a pet or teaching a child.
+
+### How it Works
+
+The AI agent starts with a basic neural network "brain" that doesn't know how to behave. It moves around randomly at first. As you watch its behavior and give it rewards (when it does something good) or punishments (when it does something bad), the neural network learns and adapts its behavior over time.
+
+### Quick Start Guide
+
+**🎯 Goal: Train your agent to stay inside the red circle**
+
+1. **Start the app** - You'll see a canvas with:
+   - A **white dot** (your AI agent) moving randomly
+   - A **red circle** (target area)
+   - A **blue square** and **green triangle** (other shapes)
+   - **Control buttons** at the bottom
+
+2. **Watch and Wait** - Let the agent move around for a few seconds to observe its random behavior
+
+3. **Reward Good Behavior** - When the agent enters or stays in the red circle, click the **"Reward"** button immediately
+
+4. **Configure Settings** (recommended):
+   - Click the ⚙️ settings button
+   - Enable **"Intrinsic Punishment"** (helps discourage inactivity)
+   - Enable **"Gradient Rewards"** (makes learning more effective)
+
+5. **Continue Training** - Keep rewarding the agent when it's in the circle. After 10-15 rewards, you should notice it starts preferring the circle area!
+
+6. **Test Learning** - Stop giving rewards and see if the agent has learned to stay in the circle on its own
+
+### What Makes This Special?
+
+- **Real-time Learning**: Watch the AI change its behavior as you train it
+- **Visual Feedback**: See exactly what the agent is "thinking" and how it responds
+- **Hands-on ML Education**: Experience machine learning concepts interactively
+- **Behavioral Psychology**: Understand how shaping works in both AI and animal training
+
 ## Features
 
 ### Core Components
