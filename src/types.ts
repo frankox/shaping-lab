@@ -30,7 +30,8 @@ export interface NetworkOutput {
 
 export interface LearningEvent {
   states: AgentState[];
-  reward: number;
+  reward: number; // Single reward value for non-gradient mode
+  rewards?: number[]; // Array of reward values for gradient mode
   isGradient: boolean;
   timestamp: number;
 }

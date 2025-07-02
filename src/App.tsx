@@ -108,7 +108,11 @@ const App = () => {
     
     try {
       const canvasDimensions = canvasManagerRef.current.getDimensions();
-      const rewards = new Array(event.states.length).fill(event.reward);
+      
+      // Use gradient rewards array if available, otherwise use single reward value
+      const rewards = event.isGradient && event.rewards 
+        ? event.rewards 
+        : new Array(event.states.length).fill(event.reward);
       
       await neuralNetworkRef.current.trainOnExperience(
         event.states,

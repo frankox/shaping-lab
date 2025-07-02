@@ -52,8 +52,10 @@ export function generateGradientRewards(
   
   const rewards: number[] = [];
   for (let i = 0; i < stateCount; i++) {
+    // Exponential distribution: latest states get much higher rewards
     const t = i / (stateCount - 1);
-    rewards.push(lerp(minValue, maxValue, t));
+    const exponentialT = Math.pow(t, 0.3); // Use smaller exponent for stronger effect on recent states
+    rewards.push(lerp(minValue, maxValue, exponentialT));
   }
   return rewards;
 }

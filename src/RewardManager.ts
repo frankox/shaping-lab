@@ -7,6 +7,7 @@ export class RewardManager {
   private intrinsicPunishmentTimer: ReturnType<typeof setTimeout> | null = null;
   private config: AppConfig;
   private onLearningEvent: (event: LearningEvent) => void;
+  private maxBufferSize: number = 80;
 
   constructor(
     config: AppConfig,
@@ -24,6 +25,11 @@ export class RewardManager {
 
   addState(state: AgentState): void {
     this.stateBuffer.push({ ...state });
+    
+    // Enforce max buffer size
+    if (this.stateBuffer.length > this.maxBufferSize) {
+      this.stateBuffer.shift(); // Remove oldest state
+    }
   }
 
   applyManualReward(): void {
@@ -32,26 +38,35 @@ export class RewardManager {
     this.resetIntrinsicPunishmentTimer();
     
     let states: AgentState[];
+    let learningEvent: LearningEvent;
 
     if (this.config.gradientReward) {
       // Use all buffered states with gradient rewards
       states = [...this.stateBuffer];
-      generateGradientRewards(
+      const gradientRewards = generateGradientRewards(
         states.length,
         this.config.rewardMin,
         this.config.rewardMax
       );
+
+      learningEvent = {
+        states,
+        reward: this.config.rewardMax, // Keep for backward compatibility
+        rewards: gradientRewards, // Use gradient rewards array
+        isGradient: true,
+        timestamp: Date.now(),
+      };
     } else {
       // Use only the most recent state
       states = [this.stateBuffer[this.stateBuffer.length - 1]];
+      
+      learningEvent = {
+        states,
+        reward: this.config.rewardMax,
+        isGradient: false,
+        timestamp: Date.now(),
+      };
     }
-
-    const learningEvent: LearningEvent = {
-      states,
-      reward: this.config.rewardMax,
-      isGradient: this.config.gradientReward,
-      timestamp: Date.now(),
-    };
 
     this.onLearningEvent(learningEvent);
     this.clearStateBuffer();
@@ -66,26 +81,35 @@ export class RewardManager {
     this.resetIntrinsicPunishmentTimer();
 
     let states: AgentState[];
+    let learningEvent: LearningEvent;
 
     if (this.config.gradientReward) {
       // Use all buffered states with gradient punishments (negative rewards)
       states = [...this.stateBuffer];
-      generateGradientRewards(
+      const gradientRewards = generateGradientRewards(
         states.length,
         -this.config.gradientPunishmentMax,
         -this.config.gradientPunishmentMin
       );
+
+      learningEvent = {
+        states,
+        reward: -this.config.gradientPunishmentMax, // Keep for backward compatibility
+        rewards: gradientRewards, // Use gradient rewards array (negative values)
+        isGradient: true,
+        timestamp: Date.now(),
+      };
     } else {
       // Use only the most recent state with negative reward  
       states = [this.stateBuffer[this.stateBuffer.length - 1]];
+      
+      learningEvent = {
+        states,
+        reward: -this.config.gradientPunishmentMax,
+        isGradient: false,
+        timestamp: Date.now(),
+      };
     }
-
-    const learningEvent: LearningEvent = {
-      states,
-      reward: -this.config.gradientPunishmentMax,
-      isGradient: this.config.gradientReward,
-      timestamp: Date.now(),
-    };
 
     this.onLearningEvent(learningEvent);
     this.clearStateBuffer();
@@ -125,12 +149,13 @@ export class RewardManager {
 
     // Intrinsic punishment is always in gradient mode with neutral (0) gradient
     const states = [...this.stateBuffer];
-    // Generate neutral gradient (all zeros)
-    new Array(states.length).fill(0);
+    // Generate neutral gradient (all zeros) - exponential doesn't matter for zeros
+    const neutralRewards = new Array(states.length).fill(0);
 
     const learningEvent: LearningEvent = {
       states,
       reward: 0,
+      rewards: neutralRewards,
       isGradient: true,
       timestamp: Date.now(),
     };
