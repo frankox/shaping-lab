@@ -172,21 +172,26 @@ const App = () => {
       const canvasDimensions = canvasManager.getDimensions();
       const networkInput = agent.getNetworkInput(SHAPES, canvasDimensions.width, canvasDimensions.height);
 
-      // Get neural network prediction (use cached prediction for smooth rendering)
+      // Get network output for rendering info (even during training)
       const networkOutput = neuralNetwork.getCachedPrediction() || { 
         forwardSpeed: 0, 
         rotationDirection: 0, 
         rotationSpeed: 0 
       };
 
-      // Apply action to agent
-      agent.applyAction(networkOutput, deltaTime * 60); // Normalize to 60fps for consistent movement
-      agent.constrainToCanvas(canvasDimensions.width, canvasDimensions.height);
+      // Only move agent if not currently training
+      if (!neuralNetwork.isCurrentlyTraining()) {
+        // Apply action to agent
+        agent.applyAction(networkOutput, deltaTime * 60); // Normalize to 60fps for consistent movement
+        agent.constrainToCanvas(canvasDimensions.width, canvasDimensions.height);
 
-      // Add state to reward manager buffer
+        neuralNetwork.predict(networkInput).catch((error: unknown) => {
+          console.error('Neural network prediction error:', error);
+        });
+      }
+
       rewardManager.addState(currentState);
 
-      // Render everything in order for best performance
       canvasManager.renderShapes(SHAPES);
       canvasManager.renderAgent(agent);
 
@@ -200,7 +205,6 @@ const App = () => {
         setRewardFeedback(null);
       }
 
-      // Render info
       canvasManager.renderInfo({
         stateBufferSize: rewardManager.getStateBufferSize(),
         timeSinceLastLearning: rewardManager.getTimeSinceLastLearning(),
@@ -209,11 +213,6 @@ const App = () => {
         agentHeading: agent.getHeading(),
         agentVelocity: agent.getVelocity(),
         networkOutput: networkOutput,
-      });
-
-      // Update neural network prediction asynchronously (don't block rendering)
-      neuralNetwork.predict(networkInput).catch((error: unknown) => {
-        console.error('Neural network prediction error:', error);
       });
 
       // Update UI state with throttling to avoid too frequent React updates
