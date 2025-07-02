@@ -4,7 +4,7 @@ import { generateGradientRewards } from './utils';
 export class RewardManager {
   private stateBuffer: AgentState[] = [];
   private lastLearningTime: number = Date.now();
-  private intrinsicPunishmentTimer: number | null = null;
+  private intrinsicPunishmentTimer: ReturnType<typeof setTimeout> | null = null;
   private config: AppConfig;
   private onLearningEvent: (event: LearningEvent) => void;
 

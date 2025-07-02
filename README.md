@@ -12,12 +12,12 @@ The AI agent starts with a basic neural network "brain" that doesn't know how to
 
 ### Quick Start Guide
 
-**🎯 Goal: Train your agent to stay inside the red circle**
+**🎯 Goal: Train your agent to stay inside the circle**
 
 1. **Start the app** - You'll see a canvas with:
-   - A **white dot** (your AI agent) moving randomly
-   - A **red circle** (target area)
-   - A **blue square** and **green triangle** (other shapes)
+   - A **red dot** (your AI agent) moving randomly
+   - A **circle** (target area)
+   - A **square** and **green triangle** (other shapes)
    - **Control buttons** at the bottom
 
 2. **Watch and Wait** - Let the agent move around for a few seconds to observe its random behavior
@@ -171,7 +171,3 @@ The application is fully responsive and touch-friendly:
 - Edge 79+
 
 WebGL support required for TensorFlow.js operations.
-
-## License
-
-MIT License - see LICENSE file for details.
