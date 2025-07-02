@@ -35,6 +35,8 @@ export interface LearningEvent {
   timestamp: number;
 }
 
+export type NetworkArchitecture = 'simple-mlp' | 'residual-mlp' | 'recurrent-lstm';
+
 export interface AppConfig {
   intrinsicPunishment: boolean;
   intrinsicTimeframe: number; // seconds
@@ -51,6 +53,7 @@ export interface AppConfig {
   gradientPunishmentMax: number;
   canvasWidth: number;
   canvasHeight: number;
+  networkArchitecture: NetworkArchitecture;
 }
 
 export interface Shape {
@@ -76,6 +79,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   gradientPunishmentMax: 1,
   canvasWidth: 800,
   canvasHeight: 600,
+  networkArchitecture: 'simple-mlp',
 };
 
 export const SHAPES: Shape[] = [

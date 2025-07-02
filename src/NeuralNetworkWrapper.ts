@@ -1,9 +1,9 @@
 import * as tf from '@tensorflow/tfjs';
-import { NetworkInput, NetworkOutput, AgentState, Shape } from './types';
+import { NetworkInput, NetworkOutput, AgentState, Shape, NetworkArchitecture } from './types';
 import { clamp, distanceToShape } from './utils';
 
 export class NeuralNetworkWrapper {
-  private model: tf.Sequential;
+  private model: tf.LayersModel;
   private optimizer: tf.Optimizer;
   private isTraining: boolean = false;
   private learningRate: number = 0.001;
@@ -12,13 +12,30 @@ export class NeuralNetworkWrapper {
   private predictionCacheTimeout: number = 50; // Cache for 50ms
   private explorationRate: number = 0.3; // Higher for more exploration
   private step: number = 0;
+  private architecture: NetworkArchitecture = 'simple-mlp';
+  private sequenceBuffer: number[][] = []; // For LSTM sequences
+  private maxSequenceLength: number = 10; // Store last 10 states for LSTM
 
-  constructor() {
+  constructor(architecture: NetworkArchitecture = 'simple-mlp') {
+    this.architecture = architecture;
     this.optimizer = tf.train.adam(this.learningRate);
     this.model = this.createModel();
   }
 
-  private createModel(): tf.Sequential {
+  private createModel(): tf.LayersModel {
+    switch (this.architecture) {
+      case 'simple-mlp':
+        return this.createSimpleMLP();
+      case 'residual-mlp':
+        return this.createResidualMLP();
+      case 'recurrent-lstm':
+        return this.createLSTM();
+      default:
+        return this.createSimpleMLP();
+    }
+  }
+
+  private createSimpleMLP(): tf.Sequential {
     const model = tf.sequential({
       layers: [
         tf.layers.dense({
@@ -57,8 +74,99 @@ export class NeuralNetworkWrapper {
     return model;
   }
 
+  private createResidualMLP(): tf.LayersModel {
+    const input = tf.input({ shape: [7] });
+    
+    // First dense layer
+    const dense1 = tf.layers.dense({
+      units: 64,
+      activation: 'relu',
+      kernelInitializer: 'randomNormal',
+    }).apply(input) as tf.SymbolicTensor;
+    
+    // Second dense layer
+    const dense2 = tf.layers.dense({
+      units: 64,
+      activation: 'relu',
+      kernelInitializer: 'randomNormal',
+    }).apply(dense1) as tf.SymbolicTensor;
+    
+    // Add residual connection
+    const residual = tf.layers.add().apply([dense1, dense2]) as tf.SymbolicTensor;
+    
+    // Third dense layer
+    const dense3 = tf.layers.dense({
+      units: 32,
+      activation: 'relu',
+      kernelInitializer: 'randomNormal',
+    }).apply(residual) as tf.SymbolicTensor;
+    
+    // Output layer
+    const output = tf.layers.dense({
+      units: 3,
+      activation: 'tanh',
+      kernelInitializer: 'randomNormal',
+    }).apply(dense3) as tf.SymbolicTensor;
+
+    const model = tf.model({ inputs: input, outputs: output });
+    
+    model.compile({
+      optimizer: this.optimizer,
+      loss: 'meanSquaredError',
+    });
+
+    return model;
+  }
+
+  private createLSTM(): tf.Sequential {
+    const model = tf.sequential({
+      layers: [
+        tf.layers.lstm({
+          units: 16,
+          inputShape: [this.maxSequenceLength, 7], // sequences of 7 features
+          returnSequences: false,
+        }),
+        tf.layers.dense({
+          units: 16,
+          activation: 'relu',
+          kernelInitializer: 'randomNormal',
+        }),
+        tf.layers.dense({
+          units: 3,
+          activation: 'tanh',
+          kernelInitializer: 'randomNormal',
+        }),
+      ],
+    });
+
+    model.compile({
+      optimizer: this.optimizer,
+      loss: 'meanSquaredError',
+    });
+
+    return model;
+  }
+
+  private addToSequenceBuffer(input: number[]): void {
+    this.sequenceBuffer.push(input);
+    
+    // Keep only the last maxSequenceLength states
+    if (this.sequenceBuffer.length > this.maxSequenceLength) {
+      this.sequenceBuffer.shift();
+    }
+  }
+
+  private getSequenceInput(): number[][] {
+    // If we don't have enough data, pad with zeros
+    while (this.sequenceBuffer.length < this.maxSequenceLength) {
+      this.sequenceBuffer.unshift(new Array(7).fill(0));
+    }
+    
+    return this.sequenceBuffer.slice();
+  }
+
   async predict(input: NetworkInput): Promise<NetworkOutput> {
-    const inputTensor = tf.tensor2d([[
+    const inputArray = [
       input.posX,
       input.posY,
       input.distToCircle,
@@ -66,7 +174,21 @@ export class NeuralNetworkWrapper {
       input.distToTriangle,
       input.heading,
       input.velocity,
-    ]]);
+    ];
+
+    let inputTensor: tf.Tensor;
+
+    if (this.architecture === 'recurrent-lstm') {
+      // Add current input to sequence buffer
+      this.addToSequenceBuffer(inputArray);
+      
+      // Create sequence tensor for LSTM
+      const sequenceData = this.getSequenceInput();
+      inputTensor = tf.tensor3d([sequenceData]); // [batch, time, features]
+    } else {
+      // Create regular tensor for MLP architectures
+      inputTensor = tf.tensor2d([inputArray]);
+    }
 
     try {
       const prediction = this.model.predict(inputTensor) as tf.Tensor;
@@ -138,7 +260,7 @@ export class NeuralNetworkWrapper {
 
         // Create network input from state
         const networkInput = this.stateToNetworkInput(state, shapes, canvasWidth, canvasHeight);
-        inputs.push([
+        const inputArray = [
           networkInput.posX,
           networkInput.posY,
           networkInput.distToCircle,
@@ -146,7 +268,9 @@ export class NeuralNetworkWrapper {
           networkInput.distToTriangle,
           networkInput.heading,
           networkInput.velocity,
-        ]);
+        ];
+        
+        inputs.push(inputArray);
 
         // Get current prediction for this state
         const currentPrediction = await this.predict(networkInput);
@@ -180,9 +304,37 @@ export class NeuralNetworkWrapper {
         targets.push(target);
       }
 
-      // Train the model
-      const inputTensor = tf.tensor2d(inputs);
-      const targetTensor = tf.tensor2d(targets);
+      let inputTensor: tf.Tensor;
+      let targetTensor: tf.Tensor;
+
+      if (this.architecture === 'recurrent-lstm') {
+        // For LSTM, we need to create sequences
+        const sequences: number[][][] = [];
+        const sequenceTargets: number[][] = [];
+        
+        for (let i = 0; i < inputs.length; i++) {
+          // Create a sequence ending with this input
+          const sequence: number[][] = [];
+          for (let j = Math.max(0, i - this.maxSequenceLength + 1); j <= i; j++) {
+            sequence.push(inputs[j] || new Array(7).fill(0));
+          }
+          
+          // Pad if needed
+          while (sequence.length < this.maxSequenceLength) {
+            sequence.unshift(new Array(7).fill(0));
+          }
+          
+          sequences.push(sequence);
+          sequenceTargets.push(targets[i]);
+        }
+        
+        inputTensor = tf.tensor3d(sequences);
+        targetTensor = tf.tensor2d(sequenceTargets);
+      } else {
+        // For MLP architectures
+        inputTensor = tf.tensor2d(inputs);
+        targetTensor = tf.tensor2d(targets);
+      }
 
       try {
         await this.model.fit(inputTensor, targetTensor, {
@@ -246,7 +398,7 @@ export class NeuralNetworkWrapper {
 
   async loadModel(name: string = 'shaping-lab-model'): Promise<boolean> {
     try {
-      const loadedModel = await tf.loadLayersModel(`localstorage://${name}`) as tf.Sequential;
+      const loadedModel = await tf.loadLayersModel(`localstorage://${name}`) as tf.LayersModel;
       this.model.dispose(); // Clean up old model
       this.model = loadedModel;
       this.model.compile({
@@ -265,6 +417,18 @@ export class NeuralNetworkWrapper {
     this.model.dispose();
     this.model = this.createModel();
     this.step = 0; // Reset exploration step
+    this.sequenceBuffer = []; // Reset sequence buffer for LSTM
+  }
+
+  switchArchitecture(newArchitecture: NetworkArchitecture): void {
+    if (newArchitecture !== this.architecture) {
+      this.architecture = newArchitecture;
+      this.resetModel();
+    }
+  }
+
+  getCurrentArchitecture(): NetworkArchitecture {
+    return this.architecture;
   }
 
   isCurrentlyTraining(): boolean {
@@ -276,3 +440,4 @@ export class NeuralNetworkWrapper {
     this.optimizer.dispose();
   }
 }
+

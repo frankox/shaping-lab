@@ -40,7 +40,7 @@ const App = () => {
         }
 
         // Initialize neural network
-        neuralNetworkRef.current = new NeuralNetworkWrapper();
+        neuralNetworkRef.current = new NeuralNetworkWrapper(config.networkArchitecture);
         
         // Initialize agent
         agentRef.current = new Agent(
@@ -169,7 +169,7 @@ const App = () => {
       });
 
       // Update neural network prediction asynchronously (don't block rendering)
-      neuralNetwork.predict(networkInput).catch(error => {
+      neuralNetwork.predict(networkInput).catch((error: unknown) => {
         console.error('Neural network prediction error:', error);
       });
 
@@ -204,6 +204,11 @@ const App = () => {
 
     if (canvasManagerRef.current) {
       canvasManagerRef.current.resize(config.canvasWidth, config.canvasHeight);
+    }
+
+    // Handle network architecture changes
+    if (neuralNetworkRef.current && neuralNetworkRef.current.getCurrentArchitecture() !== config.networkArchitecture) {
+      neuralNetworkRef.current.switchArchitecture(config.networkArchitecture);
     }
   }, [config]);
 
@@ -274,6 +279,19 @@ const App = () => {
         </div>
         
         <div className="controls">
+          <div className="status-display" style={{
+            marginBottom: '1rem',
+            padding: '0.5rem',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px',
+            fontSize: '0.85rem',
+            color: '#666'
+          }}>
+            <div>States buffered: {stateBufferSize}</div>
+            <div>Time since learning: {Math.round(timeSinceLastLearning)}s</div>
+            <div>Status: {isTraining ? 'Training...' : 'Active'}</div>
+          </div>
+          
           <button
             className="reward-btn"
             onClick={handleReward}

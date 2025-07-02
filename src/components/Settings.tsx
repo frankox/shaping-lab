@@ -1,7 +1,5 @@
-import React, { useState } from 'react';
-import { AppConfig } from '../types';
-import { DemoSelector } from './DemoSelector';
-import { DemoScenario } from '../demoScenarios';
+import React from 'react';
+import { AppConfig, NetworkArchitecture } from '../types';
 
 interface SettingsProps {
   isOpen: boolean;
@@ -33,6 +31,57 @@ export const Settings: React.FC<SettingsProps> = ({
       </div>
       
       <div className="sidebar-content">
+        <div className="setting-group">
+          <h3>Neural Network Architecture</h3>
+          
+          <div className="setting-item">
+            <label>
+              Architecture Type
+            </label>
+            <select
+              value={config.networkArchitecture}
+              onChange={(e) => handleChange('networkArchitecture', e.target.value as NetworkArchitecture)}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                borderRadius: '4px',
+                border: '1px solid #ccc',
+                backgroundColor: '#fff',
+                fontSize: '0.9rem',
+                marginTop: '0.25rem',
+              }}
+            >
+              <option value="simple-mlp">Simple MLP</option>
+              <option value="residual-mlp">Residual MLP</option>
+              <option value="recurrent-lstm">Recurrent LSTM</option>
+            </select>
+            
+            <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+              {config.networkArchitecture === 'simple-mlp' && (
+                <div>
+                  <strong>Simple MLP:</strong> A basic multi-layer neural network with 3 hidden layers. 
+                  Good for learning simple patterns and quick training. Uses layers of 32, 16, and 8 neurons 
+                  with ReLU activation.
+                </div>
+              )}
+              {config.networkArchitecture === 'residual-mlp' && (
+                <div>
+                  <strong>Residual MLP:</strong> An advanced network with skip connections that help 
+                  information flow directly between layers. Better at learning complex behaviors and 
+                  avoiding vanishing gradients. Uses 64-64-32 neuron layers with residual connections.
+                </div>
+              )}
+              {config.networkArchitecture === 'recurrent-lstm' && (
+                <div>
+                  <strong>Recurrent LSTM:</strong> A memory-based network that remembers past actions 
+                  and states. Excellent for learning sequences and temporal patterns. Can develop 
+                  strategies that depend on recent history.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="setting-group">
           <h3>Reward Configuration</h3>
           
