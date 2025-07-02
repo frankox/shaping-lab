@@ -176,23 +176,23 @@ export class NeuralNetworkWrapper {
       input.velocity,
     ];
 
-    let inputTensor: tf.Tensor;
+    return tf.tidy(() => {
+      let inputTensor: tf.Tensor;
 
-    if (this.architecture === 'recurrent-lstm') {
-      // Add current input to sequence buffer
-      this.addToSequenceBuffer(inputArray);
-      
-      // Create sequence tensor for LSTM
-      const sequenceData = this.getSequenceInput();
-      inputTensor = tf.tensor3d([sequenceData]); // [batch, time, features]
-    } else {
-      // Create regular tensor for MLP architectures
-      inputTensor = tf.tensor2d([inputArray]);
-    }
+      if (this.architecture === 'recurrent-lstm') {
+        // Add current input to sequence buffer
+        this.addToSequenceBuffer(inputArray);
+        
+        // Create sequence tensor for LSTM
+        const sequenceData = this.getSequenceInput();
+        inputTensor = tf.tensor3d([sequenceData]); // [batch, time, features]
+      } else {
+        // Create regular tensor for MLP architectures
+        inputTensor = tf.tensor2d([inputArray]);
+      }
 
-    try {
       const prediction = this.model.predict(inputTensor) as tf.Tensor;
-      const values = await prediction.data();
+      const values = prediction.dataSync(); // Use dataSync for synchronous operation in tidy
 
       // Convert tanh output [-1, 1] to desired ranges
       let rotationDirection = values[0]; // Keep [-1, 1]
@@ -222,9 +222,7 @@ export class NeuralNetworkWrapper {
       this.lastPredictionTime = performance.now();
 
       return result;
-    } finally {
-      inputTensor.dispose();
-    }
+    });
   }
 
   getCachedPrediction(): NetworkOutput | null {
@@ -254,12 +252,57 @@ export class NeuralNetworkWrapper {
       const inputs: number[][] = [];
       const targets: number[][] = [];
 
+      // First, get all current predictions in batch to avoid tensor shape issues
+      const networkInputs: NetworkInput[] = [];
       for (let i = 0; i < states.length; i++) {
         const state = states[i];
-        const reward = rewards[i];
-
-        // Create network input from state
         const networkInput = this.stateToNetworkInput(state, shapes, canvasWidth, canvasHeight);
+        networkInputs.push(networkInput);
+      }
+
+      // Get current predictions for all states in batch
+      const currentPredictions: NetworkOutput[] = [];
+      for (const networkInput of networkInputs) {
+        // Use tf.tidy to manage tensor memory properly
+        const prediction = tf.tidy(() => {
+          const inputArray = [
+            networkInput.posX,
+            networkInput.posY,
+            networkInput.distToCircle,
+            networkInput.distToSquare,
+            networkInput.distToTriangle,
+            networkInput.heading,
+            networkInput.velocity,
+          ];
+
+          let inputTensor: tf.Tensor;
+          if (this.architecture === 'recurrent-lstm') {
+            this.addToSequenceBuffer(inputArray);
+            const sequenceData = this.getSequenceInput();
+            inputTensor = tf.tensor3d([sequenceData]);
+          } else {
+            inputTensor = tf.tensor2d([inputArray]);
+          }
+
+          const predictionTensor = this.model.predict(inputTensor) as tf.Tensor;
+          const values = predictionTensor.dataSync(); // Use dataSync for sync operation
+          
+          return {
+            rotationDirection: values[0],
+            rotationSpeed: (values[1] + 1) / 2,
+            forwardSpeed: (values[2] + 1) / 2,
+          };
+        });
+        
+        currentPredictions.push(prediction);
+      }
+
+      // Now process targets based on predictions
+      for (let i = 0; i < states.length; i++) {
+        const reward = rewards[i];
+        const networkInput = networkInputs[i];
+        const currentPrediction = currentPredictions[i];
+
         const inputArray = [
           networkInput.posX,
           networkInput.posY,
@@ -272,9 +315,6 @@ export class NeuralNetworkWrapper {
         
         inputs.push(inputArray);
 
-        // Get current prediction for this state
-        const currentPrediction = await this.predict(networkInput);
-        
         // Improved learning strategy based on reward
         let target: number[];
         
@@ -340,8 +380,13 @@ export class NeuralNetworkWrapper {
         await this.model.fit(inputTensor, targetTensor, {
           epochs: 1,
           verbose: 0,
-          batchSize: Math.min(32, inputs.length),
+          batchSize: Math.min(8, inputs.length), // Smaller batch size to avoid memory issues
         });
+      } catch (fitError) {
+        console.error('Model fit error:', fitError);
+        console.log('Input tensor shape:', inputTensor.shape);
+        console.log('Target tensor shape:', targetTensor.shape);
+        console.log('Architecture:', this.architecture);
       } finally {
         inputTensor.dispose();
         targetTensor.dispose();

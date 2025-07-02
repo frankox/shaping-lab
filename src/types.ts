@@ -56,6 +56,19 @@ export interface AppConfig {
   networkArchitecture: NetworkArchitecture;
 }
 
+export interface AutoTrainingEvent {
+  type: 'reward' | 'punishment';
+  value: number;
+  reason: string;
+}
+
+export interface DemoScenarioState {
+  isActive: boolean;
+  selectedScenario: string | null;
+  autoTrainingInterval: number; // milliseconds
+  lockedSettings: Set<keyof AppConfig>;
+}
+
 export interface Shape {
   type: 'circle' | 'square' | 'triangle';
   position: Vector2D;
@@ -80,6 +93,13 @@ export const DEFAULT_CONFIG: AppConfig = {
   canvasWidth: 800,
   canvasHeight: 600,
   networkArchitecture: 'simple-mlp',
+};
+
+export const DEFAULT_DEMO_STATE: DemoScenarioState = {
+  isActive: false,
+  selectedScenario: null,
+  autoTrainingInterval: 200,
+  lockedSettings: new Set(),
 };
 
 export const SHAPES: Shape[] = [

@@ -1,75 +1,93 @@
 // Demo scenarios for the Shaping Lab
 
+import { Shape, AgentState, AutoTrainingEvent } from './types';
+import { isInsideShape, distanceToShape } from './utils';
+
 export interface DemoScenario {
   name: string;
   description: string;
   config: Partial<import('./types').AppConfig>;
   instructions: string[];
+  lockedSettings: (keyof import('./types').AppConfig)[];
+  autoTrainingLogic: (agentState: AgentState, shapes: Shape[]) => AutoTrainingEvent | null;
 }
 
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
-    name: "Basic Circle Training",
-    description: "Teach the agent to stay inside the green circle using manual rewards",
+    name: "Basic Circle Training (Auto)",
+    description: "Automatically rewards the agent when inside the green circle",
     config: {
-      intrinsicPunishment: false,
+      intrinsicPunishment: true,
+      intrinsicTimeframe: 8,
+      intrinsicGradientPunishmentMin: 0,
+      intrinsicGradientPunishmentMax: 0.3,
       gradientReward: false,
       manualPunishmentEnabled: false,
       rewardMin: 0,
       rewardMax: 1,
     },
+    lockedSettings: ['manualPunishmentEnabled'],
+    autoTrainingLogic: (agentState: AgentState, shapes: Shape[]) => {
+      const circleShape = shapes.find(s => s.type === 'circle');
+      if (circleShape && isInsideShape(agentState.position, circleShape)) {
+        return {
+          type: 'reward',
+          value: 1,
+          reason: 'Agent is inside the target circle'
+        };
+      }
+      return null;
+    },
     instructions: [
-      "Watch the agent move randomly around the canvas",
-      "Click 'Reward' every time the agent enters the green circle",
-      "After 5-10 rewards, notice the agent starts favoring the circle area",
-      "Continue rewarding to strengthen the behavior",
-      "Eventually, stop rewarding and observe if the behavior persists"
+      "This demo automatically rewards the agent when it enters the green circle",
+      "Watch how the agent learns to stay in the circle without manual input",
+      "Manual punishment is disabled for this scenario",
+      "Intrinsic punishment is enabled to encourage exploration and activity",
+      "You can adjust the intrinsic punishment timeframe and values in settings",
+      "The agent will gradually learn to prefer the circle area",
+      "Notice how consistent automatic rewards lead to stable behavior"
     ]
   },
   
   {
-    name: "Advanced Circle Training with Gradient",
-    description: "Enhanced training using gradient rewards for better learning",
-    config: {
-      intrinsicPunishment: false,
-      gradientReward: true,
-      manualPunishmentEnabled: false,
-      rewardMin: 0,
-      rewardMax: 1,
-    },
-    instructions: [
-      "Enable gradient rewards in settings",
-      "Reward the agent when it approaches or enters the circle",
-      "The gradient system will reward all recent states leading to the reward",
-      "This creates smoother learning and better path optimization",
-      "Observe how the agent learns more complex approach patterns"
-    ]
-  },
-
-  {
-    name: "Circle Training with Intrinsic Punishment",
-    description: "Complete training scenario with automatic discouragement of inactivity",
+    name: "Advanced Circle Training with Gradient (Auto)",
+    description: "Enhanced automatic training using gradient rewards for better learning",
     config: {
       intrinsicPunishment: true,
-      intrinsicTimeframe: 5,
+      intrinsicTimeframe: 10,
+      intrinsicGradientPunishmentMin: 0,
+      intrinsicGradientPunishmentMax: 0.2,
       gradientReward: true,
       manualPunishmentEnabled: false,
       rewardMin: 0,
       rewardMax: 1,
     },
+    lockedSettings: ['manualPunishmentEnabled', 'gradientReward'],
+    autoTrainingLogic: (agentState: AgentState, shapes: Shape[]) => {
+      const circleShape = shapes.find(s => s.type === 'circle');
+      if (circleShape && isInsideShape(agentState.position, circleShape)) {
+        return {
+          type: 'reward',
+          value: 1,
+          reason: 'Agent is inside the target circle (gradient mode)'
+        };
+      }
+      return null;
+    },
     instructions: [
-      "Enable intrinsic punishment (5 second timeframe)",
-      "Enable gradient rewards",
-      "The agent will receive neutral punishment if no manual reward is given",
-      "Reward the agent for entering/staying in the circle",
-      "Notice how intrinsic punishment encourages exploration",
-      "The agent should learn to stay active and seek rewards"
+      "Gradient rewards are automatically enabled for smoother learning",
+      "The system rewards all recent states when the agent enters the circle",
+      "This creates better path optimization than simple rewards",
+      "Intrinsic punishment is enabled to maintain agent activity",
+      "You can configure intrinsic punishment timeframe and intensity",
+      "Observe how the agent learns more complex approach patterns",
+      "Gradient mode is locked and cannot be changed in this scenario"
     ]
   },
 
   {
-    name: "Shape Avoidance Training",
-    description: "Train the agent to avoid certain shapes using punishment",
+    name: "Shape Avoidance Training (Auto)",
+    description: "Automatically rewards circle entry and punishes shape collisions",
     config: {
       intrinsicPunishment: true,
       intrinsicTimeframe: 8,
@@ -80,34 +98,94 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       gradientPunishmentMin: 0,
       gradientPunishmentMax: 1,
     },
+    lockedSettings: ['manualPunishmentEnabled', 'gradientReward'],
+    autoTrainingLogic: (agentState: AgentState, shapes: Shape[]) => {
+      const circleShape = shapes.find(s => s.type === 'circle');
+      const squareShape = shapes.find(s => s.type === 'square');
+      const triangleShape = shapes.find(s => s.type === 'triangle');
+      
+      // Check for collisions with forbidden shapes (very close proximity)
+      const collisionThreshold = 5;
+      
+      if (squareShape && distanceToShape(agentState.position, squareShape) < collisionThreshold) {
+        return {
+          type: 'punishment',
+          value: -1,
+          reason: 'Agent is too close to the square (forbidden)'
+        };
+      }
+      
+      if (triangleShape && distanceToShape(agentState.position, triangleShape) < collisionThreshold) {
+        return {
+          type: 'punishment',
+          value: -1,
+          reason: 'Agent is too close to the triangle (forbidden)'
+        };
+      }
+      
+      // Reward for being in the circle
+      if (circleShape && isInsideShape(agentState.position, circleShape)) {
+        return {
+          type: 'reward',
+          value: 1,
+          reason: 'Agent is safely inside the target circle'
+        };
+      }
+      
+      return null;
+    },
     instructions: [
-      "Enable both manual punishment and intrinsic punishment",
-      "Reward the agent for staying in the circle",
-      "Punish the agent when it touches the square or triangle",
-      "Use gradient punishments to discourage approach paths",
-      "Observe how the agent learns to navigate around obstacles",
-      "The agent should develop complex avoidance behaviors"
+      "This scenario automatically rewards circle entry and punishes shape collisions",
+      "The agent learns to navigate around the square and triangle",
+      "Gradient punishments discourage approach paths to forbidden shapes",
+      "Manual punishment is enabled but locked - the system handles it automatically",
+      "Observe complex avoidance behaviors developing over time"
     ]
   },
 
   {
-    name: "Exploration vs Exploitation",
-    description: "Balance between encouraging exploration and rewarding good behavior",
+    name: "Exploration Encouragement (Auto)",
+    description: "Rewards the agent for exploring new areas of the canvas",
     config: {
       intrinsicPunishment: true,
       intrinsicTimeframe: 10,
+      intrinsicGradientPunishmentMin: 0,
+      intrinsicGradientPunishmentMax: 0.1,
       gradientReward: true,
       manualPunishmentEnabled: false,
       rewardMin: 0.2,
       rewardMax: 1,
     },
+    lockedSettings: ['manualPunishmentEnabled'],
+    autoTrainingLogic: (() => {
+      const visitedAreas = new Set<string>();
+      const gridSize = 50; // Divide canvas into 50x50 pixel grid cells
+      
+      return (agentState: AgentState, _shapes: Shape[]) => {
+        // Create a grid-based exploration system
+        const gridX = Math.floor(agentState.position.x / gridSize);
+        const gridY = Math.floor(agentState.position.y / gridSize);
+        const cellKey = `${gridX},${gridY}`;
+        
+        if (!visitedAreas.has(cellKey)) {
+          visitedAreas.add(cellKey);
+          return {
+            type: 'reward',
+            value: 0.5,
+            reason: `Explored new area at grid ${gridX},${gridY}`
+          };
+        }
+        
+        return null;
+      };
+    })(),
     instructions: [
-      "Set reward minimum to 0.2 (encourages some exploration)",
-      "Long intrinsic punishment timeframe (10 seconds)",
-      "Reward the agent intermittently for circle visits",
-      "Don't reward every circle entry - create uncertainty",
-      "Observe how the agent balances staying in the circle vs exploring",
-      "This mimics real-world reinforcement learning scenarios"
+      "This scenario encourages exploration of new canvas areas",
+      "The agent receives rewards for visiting previously unexplored grid cells",
+      "Intrinsic punishment is enabled with a long timeframe for extended exploration",
+      "You can adjust intrinsic punishment settings to change exploration behavior",
+      "Reward minimum is set to 0.2 to encourage continued movement",
+      "Observe how the agent develops systematic exploration patterns"
     ]
   }
 ];
@@ -120,4 +198,12 @@ export function applyDemoScenario(
     ...prevConfig,
     ...scenario.config
   }));
+}
+
+export function getLockedSettings(scenario: DemoScenario | null): Set<keyof import('./types').AppConfig> {
+  return scenario ? new Set(scenario.lockedSettings) : new Set();
+}
+
+export function findScenarioByName(name: string): DemoScenario | null {
+  return DEMO_SCENARIOS.find(scenario => scenario.name === name) || null;
 }
