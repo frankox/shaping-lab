@@ -3,11 +3,9 @@ import { Agent } from './Agent';
 import { CanvasManager } from './CanvasManager';
 import { NeuralNetworkWrapper } from './NeuralNetworkWrapper';
 import { RewardManager } from './RewardManager';
-import { AutoTrainer } from './AutoTrainer';
 import { Settings } from './components/Settings';
 import About from './components/About';
-import { AppConfig, DEFAULT_CONFIG, SHAPES, LearningEvent, DemoScenarioState, DEFAULT_DEMO_STATE, AutoTrainingEvent } from './types';
-import { DemoScenario, applyDemoScenario, getLockedSettings, findScenarioByName } from './demoScenarios';
+import { AppConfig, DEFAULT_CONFIG, SHAPES, LearningEvent } from './types';
 
 const App = () => {
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -15,10 +13,8 @@ const App = () => {
   const canvasManagerRef = useRef<CanvasManager | null>(null);
   const neuralNetworkRef = useRef<NeuralNetworkWrapper | null>(null);
   const rewardManagerRef = useRef<RewardManager | null>(null);
-  const autoTrainerRef = useRef<AutoTrainer | null>(null);
   
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
-  const [demoState, setDemoState] = useState<DemoScenarioState>(DEFAULT_DEMO_STATE);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -59,12 +55,6 @@ const App = () => {
         // Initialize reward manager
         rewardManagerRef.current = new RewardManager(config, handleLearningEvent);
 
-        // Initialize auto trainer
-        autoTrainerRef.current = new AutoTrainer(
-          handleAutoTrainingEvent,
-          () => agentRef.current?.getState() || null
-        );
-
         // Add canvas to DOM
         if (canvasContainerRef.current && canvasManagerRef.current) {
           canvasContainerRef.current.appendChild(canvasManagerRef.current.getCanvas());
@@ -89,9 +79,6 @@ const App = () => {
       }
       if (rewardManagerRef.current) {
         rewardManagerRef.current.dispose();
-      }
-      if (autoTrainerRef.current) {
-        autoTrainerRef.current.dispose();
       }
       // Clear canvas container
       if (canvasContainerRef.current) {
@@ -125,31 +112,6 @@ const App = () => {
       console.error('Training failed:', error);
     } finally {
       setIsTraining(false);
-    }
-  }, []);
-
-  // Handle auto training events from demo scenarios
-  const handleAutoTrainingEvent = useCallback((event: AutoTrainingEvent) => {
-    if (!rewardManagerRef.current) return;
-
-    try {
-      if (event.type === 'reward') {
-        rewardManagerRef.current.applyManualReward();
-        setRewardFeedback({ 
-          type: 'reward', 
-          timestamp: Date.now(),
-          reason: event.reason 
-        });
-      } else if (event.type === 'punishment') {
-        rewardManagerRef.current.applyManualPunishment();
-        setRewardFeedback({ 
-          type: 'punishment', 
-          timestamp: Date.now(),
-          reason: event.reason 
-        });
-      }
-    } catch (error) {
-      console.error('Auto training event failed:', error);
     }
   }, []);
 
@@ -237,49 +199,6 @@ const App = () => {
 
     canvasManagerRef.current.start(renderFrame);
   }, [renderFrame]);
-
-  // Demo scenario handlers
-  const handleDemoScenarioSelect = useCallback((scenario: DemoScenario | null) => {
-    if (autoTrainerRef.current) {
-      autoTrainerRef.current.stop();
-    }
-    
-    setDemoState(prev => ({
-      ...prev,
-      selectedScenario: scenario?.name || null,
-      isActive: false,
-      lockedSettings: scenario ? getLockedSettings(scenario) : new Set()
-    }));
-
-    if (scenario) {
-      applyDemoScenario(scenario, setConfig);
-    }
-  }, []);
-
-  const handleDemoStart = useCallback(() => {
-    if (!autoTrainerRef.current || !demoState.selectedScenario) return;
-
-    const scenario = findScenarioByName(demoState.selectedScenario);
-    if (scenario) {
-      autoTrainerRef.current.setScenario(scenario);
-      autoTrainerRef.current.start();
-      setDemoState(prev => ({ ...prev, isActive: true }));
-    }
-  }, [demoState.selectedScenario]);
-
-  const handleDemoStop = useCallback(() => {
-    if (autoTrainerRef.current) {
-      autoTrainerRef.current.stop();
-    }
-    setDemoState(prev => ({ ...prev, isActive: false }));
-  }, []);
-
-  const handleDemoIntervalChange = useCallback((interval: number) => {
-    setDemoState(prev => ({ ...prev, autoTrainingInterval: interval }));
-    if (autoTrainerRef.current) {
-      autoTrainerRef.current.setInterval(interval);
-    }
-  }, []);
 
   // Handle config changes
   useEffect(() => {
@@ -375,35 +294,12 @@ const App = () => {
             <div>States buffered: {stateBufferSize}</div>
             <div>Time since learning: {Math.round(timeSinceLastLearning)}s</div>
             <div>Status: {isTraining ? 'Training...' : 'Active'}</div>
-            {demoState.isActive && (
-              <div style={{ 
-                color: '#4CAF50', 
-                fontWeight: 'bold',
-                marginTop: '0.25rem'
-              }}>
-                🤖 Auto Training: {demoState.selectedScenario}
-              </div>
-            )}
-            {rewardFeedback && rewardFeedback.reason && (
-              <div style={{ 
-                fontSize: '0.75rem', 
-                color: rewardFeedback.type === 'reward' ? '#4CAF50' : '#f44336',
-                marginTop: '0.25rem',
-                fontStyle: 'italic'
-              }}>
-                Last action: {rewardFeedback.reason}
-              </div>
-            )}
           </div>
           
           <button
             className="reward-btn"
             onClick={handleReward}
-            disabled={isSettingsOpen || demoState.isActive}
-            style={{
-              opacity: demoState.isActive ? 0.5 : 1,
-              cursor: demoState.isActive ? 'not-allowed' : 'pointer'
-            }}
+            disabled={isSettingsOpen}
           >
             Reward
           </button>
@@ -412,11 +308,7 @@ const App = () => {
             <button
               className="punish-btn"
               onClick={handlePunishment}
-              disabled={isSettingsOpen || demoState.isActive}
-              style={{
-                opacity: demoState.isActive ? 0.5 : 1,
-                cursor: demoState.isActive ? 'not-allowed' : 'pointer'
-              }}
+              disabled={isSettingsOpen}
             >
               Punish
             </button>
@@ -463,12 +355,7 @@ const App = () => {
       <Settings
         isOpen={isSettingsOpen}
         config={config}
-        demoState={demoState}
         onConfigChange={setConfig}
-        onDemoScenarioSelect={handleDemoScenarioSelect}
-        onDemoStart={handleDemoStart}
-        onDemoStop={handleDemoStop}
-        onDemoIntervalChange={handleDemoIntervalChange}
         onClose={() => setIsSettingsOpen(false)}
       />
     </div>

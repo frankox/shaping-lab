@@ -1,45 +1,24 @@
 import React from 'react';
-import { AppConfig, NetworkArchitecture, DemoScenarioState } from '../types';
-import { DemoSelector } from './DemoSelector';
-import { DemoScenario } from '../demoScenarios';
+import { AppConfig, NetworkArchitecture } from '../types';
 
 interface SettingsProps {
   isOpen: boolean;
   config: AppConfig;
-  demoState: DemoScenarioState;
   onConfigChange: (config: AppConfig) => void;
-  onDemoScenarioSelect: (scenario: DemoScenario | null) => void;
-  onDemoStart: () => void;
-  onDemoStop: () => void;
-  onDemoIntervalChange: (interval: number) => void;
   onClose: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({
   isOpen,
   config,
-  demoState,
   onConfigChange,
-  onDemoScenarioSelect,
-  onDemoStart,
-  onDemoStop,
-  onDemoIntervalChange,
   onClose,
 }) => {
   const handleChange = (key: keyof AppConfig, value: any) => {
-    // Check if this setting is locked by the current demo scenario
-    if (demoState.lockedSettings.has(key)) {
-      return; // Don't allow changes to locked settings
-    }
-    
     onConfigChange({
       ...config,
       [key]: value,
     });
-  };
-
-  const isSettingLocked = (key: keyof AppConfig): boolean => {
-    return demoState.lockedSettings.has(key);
   };
 
   return (
@@ -52,15 +31,6 @@ export const Settings: React.FC<SettingsProps> = ({
       </div>
       
       <div className="sidebar-content">
-        <DemoSelector
-          demoState={demoState}
-          onScenarioSelect={onDemoScenarioSelect}
-          onStartDemo={onDemoStart}
-          onStopDemo={onDemoStop}
-          onIntervalChange={onDemoIntervalChange}
-          disabled={false}
-        />
-        
         <div className="setting-group">
           <h3>Neural Network Architecture</h3>
           
@@ -119,17 +89,13 @@ export const Settings: React.FC<SettingsProps> = ({
             <label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 Gradient Reward
-                {isSettingLocked('gradientReward') && (
-                  <span style={{ fontSize: '0.7rem', color: '#e65100', fontWeight: 'bold' }}>🔒 LOCKED</span>
-                )}
                 <div className="toggle-switch">
                   <input
                     type="checkbox"
                     checked={config.gradientReward}
                     onChange={(e) => handleChange('gradientReward', e.target.checked)}
-                    disabled={isSettingLocked('gradientReward')}
                   />
-                  <span className={`slider ${isSettingLocked('gradientReward') ? 'disabled' : ''}`}></span>
+                  <span className="slider"></span>
                 </div>
               </div>
             </label>
@@ -192,17 +158,13 @@ export const Settings: React.FC<SettingsProps> = ({
             <label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 Manual Punishment
-                {isSettingLocked('manualPunishmentEnabled') && (
-                  <span style={{ fontSize: '0.7rem', color: '#e65100', fontWeight: 'bold' }}>🔒 LOCKED</span>
-                )}
                 <div className="toggle-switch">
                   <input
                     type="checkbox"
                     checked={config.manualPunishmentEnabled}
                     onChange={(e) => handleChange('manualPunishmentEnabled', e.target.checked)}
-                    disabled={isSettingLocked('manualPunishmentEnabled')}
                   />
-                  <span className={`slider ${isSettingLocked('manualPunishmentEnabled') ? 'disabled' : ''}`}></span>
+                  <span className="slider"></span>
                 </div>
               </div>
             </label>
@@ -285,17 +247,13 @@ export const Settings: React.FC<SettingsProps> = ({
             <label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 Intrinsic Punishment
-                {isSettingLocked('intrinsicPunishment') && (
-                  <span style={{ fontSize: '0.7rem', color: '#e65100', fontWeight: 'bold' }}>🔒 LOCKED</span>
-                )}
                 <div className="toggle-switch">
                   <input
                     type="checkbox"
                     checked={config.intrinsicPunishment}
                     onChange={(e) => handleChange('intrinsicPunishment', e.target.checked)}
-                    disabled={isSettingLocked('intrinsicPunishment')}
                   />
-                  <span className={`slider ${isSettingLocked('intrinsicPunishment') ? 'disabled' : ''}`}></span>
+                  <span className="slider"></span>
                 </div>
               </div>
             </label>

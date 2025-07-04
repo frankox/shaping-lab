@@ -20,27 +20,21 @@ The AI agent starts with a basic neural network "brain" that doesn't know how to
    - A **blue square** and **orange triangle** (other shapes)
    - **Control buttons** at the bottom
 
-2. **Try a Demo Scenario** (recommended for beginners):
+2. **Manual Training** (hands-on experience):
    - Click the ⚙️ settings button
-   - Under "Demo Scenarios", select "Basic Circle Training (Auto)"
-   - Click "Start Auto Training"
-   - Watch the agent automatically learn to prefer the circle!
-
-3. **Manual Training** (for hands-on experience):
-   - Select "Manual Training (No Demo)" in settings
    - Enable **"Intrinsic Punishment"** (helps discourage inactivity)
    - Enable **"Gradient Rewards"** (makes learning more effective)
    - Close settings and watch the agent move
    - Click **"Reward"** when the agent enters the green circle
 
-4. **Experiment with Networks**:
+3. **Experiment with Networks**:
    - Try different neural network architectures (Simple MLP, Residual MLP, Recurrent LSTM)
    - Each has different learning characteristics and capabilities
 
-5. **Advanced Features**:
-   - Use the "Shape Avoidance Training" demo to see complex behavior learning
-   - Try "Exploration Encouragement" to watch systematic area discovery
-   - Adjust auto-training intervals for different learning speeds
+4. **Advanced Features**:
+   - Adjust reward and punishment settings for different learning behaviors
+   - Try different timeframes for intrinsic punishment
+   - Experiment with gradient reward ranges
 
 ### What Makes This Special?
 
@@ -59,8 +53,6 @@ The AI agent starts with a basic neural network "brain" that doesn't know how to
 - **Reward System**: Manual reward/punishment with gradient distribution options
 - **Intrinsic Learning**: Automatic punishment for inactivity to encourage exploration
 - **Real-time Training**: Live neural network updates during interaction
-- **Demo Scenarios**: Pre-configured automated training scenarios
-- **Auto Trainer**: Automatic reward/punishment system for hands-off learning
 
 ### Training Mechanics
 
@@ -69,14 +61,6 @@ The AI agent starts with a basic neural network "brain" that doesn't know how to
 - **Gradient Rewards**: Distribute rewards across state history for better learning
 - **Intrinsic Punishment**: Automatic neutral punishment after periods of inactivity
 - **State Buffering**: Maintains history of agent states for training
-- **Automated Training**: Demo scenarios that automatically apply rewards/punishments
-
-### Demo Scenarios
-
-- **Basic Circle Training**: Automatic rewards for staying in the circle
-- **Advanced Circle Training with Gradient**: Enhanced training using gradient rewards
-- **Shape Avoidance Training**: Rewards circle entry, punishes shape collisions
-- **Exploration Encouragement**: Rewards discovering new areas of the canvas
 
 ### Configuration Options
 
@@ -86,8 +70,6 @@ The AI agent starts with a basic neural network "brain" that doesn't know how to
 - Reward/punishment value ranges
 - Canvas dimensions
 - Manual punishment enable/disable
-- Auto-training interval configuration
-- Demo scenario selection with locked settings
 
 ## Architecture
 
@@ -98,9 +80,7 @@ The AI agent starts with a basic neural network "brain" that doesn't know how to
 - **CanvasManager.ts**: Rendering engine for 2D canvas visualization
 - **NeuralNetworkWrapper.ts**: TensorFlow.js integration with multiple architectures
 - **RewardManager.ts**: Handles reward distribution, gradient calculation, and state buffering
-- **AutoTrainer.ts**: Automated training system for demo scenarios
 - **Settings.tsx**: Configuration UI with network selection and parameter tuning
-- **DemoSelector.tsx**: Demo scenario selection and management interface
 
 ### Agent System
 - **Position & Movement**: 2D position with heading and velocity
@@ -113,22 +93,11 @@ The AI agent starts with a basic neural network "brain" that doesn't know how to
 2. Neural network predicts movement actions based on current architecture
 3. Agent applies actions and moves in the environment
 4. States are buffered for batch learning
-5. Manual or automated rewards/punishments trigger training
+5. Manual rewards/punishments trigger training
 6. Network weights are updated using gradient-based learning
 7. Experience replay improves learning stability
 
 ## Usage
-
-### Demo Scenarios (Recommended)
-
-The easiest way to explore the application is through the built-in demo scenarios:
-
-1. **Basic Circle Training (Auto)**: Automatically rewards the agent for entering the green circle
-2. **Advanced Circle Training with Gradient (Auto)**: Uses gradient rewards for smoother learning
-3. **Shape Avoidance Training (Auto)**: Teaches complex navigation by rewarding circle entry and punishing shape collisions
-4. **Exploration Encouragement (Auto)**: Rewards the agent for discovering new areas
-
-Each scenario automatically configures optimal settings and locks certain parameters to prevent interference with the learning process.
 
 ### Manual Training Session
 
@@ -150,13 +119,7 @@ For hands-on experience with reinforcement learning:
 
 **Goal**: Teach agent to stay inside the circle
 
-**Option 1: Automated (Beginner-friendly)**
-1. Select "Basic Circle Training (Auto)" or "Advanced Circle Training with Gradient (Auto)"
-2. Click "Start Auto Training"
-3. Watch the agent learn automatically
-4. Experiment with different auto-training intervals
-
-**Option 2: Manual (Educational)**
+**Manual Training Method**:
 1. Enable intrinsic punishment (3-10 second timeframe)
 2. Enable gradient rewards (min=0, max=1)
 3. Reward agent every time it enters or stays in the circle
@@ -313,11 +276,9 @@ The application is fully responsive and touch-friendly:
 
 ### Settings Drawer
 
-- **Demo Scenarios**: Pre-configured training scenarios with descriptions
 - **Network Architecture**: Neural network type selection with explanations
 - **Reward Configuration**: Gradient settings, value ranges, and timing
 - **Canvas Settings**: Dimension controls and visual preferences
-- **Auto-Training Controls**: Interval settings and scenario management
 
 ### Visual Feedback
 

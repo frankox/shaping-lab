@@ -4,7 +4,7 @@
 
 ### 1. Project Goal
 
-Build an interactive web simulator for shaping sessions. A neural-network-controlled agent moves in a 2D space and can be trained by the user via manual reinforcement and intrinsic or manual punishement. The goal is to enable observable learning behavior directly in the browser.
+Build an interactive web simulator for shaping sessions. A neural-network-controlled agent moves in a 2D space and can be trained by the user via manual reinforcement and intrinsic punishment. The goal is to enable observable learning behavior directly in the browser.
 
 ### 2. Architecture Overview
 
@@ -104,7 +104,7 @@ Suggestions:
 ### 8. UI & UX
 
 - Canvas area: configurable in the settings drawer.
-- Side drawer with settings: when open, the canvas and the neural network are paused and the reward and punishement button are disabled
+- Side drawer with settings: when open, the canvas and the neural network are paused and the reward and punishment button are disabled
 - Reward, Punish (if enabled)
 - Visual feedback for agent state changes.
 - It must be mobile friendly
@@ -129,7 +129,7 @@ Suggestions:
 
 - **State Buffer**: States collected since last learning.
 - **Gradient Reward**: Linearly distributed values across state history.
-- **Intrinsic Punishment**: Automatic feedback for agent activities that did't bring to a manual reward or punishement.
+- **Intrinsic Punishment**: Automatic feedback for agent activities that didn't bring to a manual reward or punishment.
 - **Manual Reward/Punishment**: User-issued learning signals.
 
 ###
