@@ -132,6 +132,21 @@ export const Settings: React.FC<SettingsProps> = ({
                   onChange={(e) => handleChange('rewardMax', Number(e.target.value))}
                 />
               </div>
+
+              <div className="setting-item">
+                <label>
+                  Reward Buffer Size
+                  <span className="value-display">{config.rewardBufferSize} states</span>
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="300"
+                  step="10"
+                  value={config.rewardBufferSize}
+                  onChange={(e) => handleChange('rewardBufferSize', Number(e.target.value))}
+                />
+              </div>
             </>
           ) : (
             <div className="setting-item">
@@ -219,6 +234,21 @@ export const Settings: React.FC<SettingsProps> = ({
                       onChange={(e) => handleChange('gradientPunishmentMax', Number(e.target.value))}
                     />
                   </div>
+
+                  <div className="setting-item">
+                    <label>
+                      Punishment Buffer Size
+                      <span className="value-display">{config.punishmentBufferSize} states</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="10"
+                      max="300"
+                      step="10"
+                      value={config.punishmentBufferSize}
+                      onChange={(e) => handleChange('punishmentBufferSize', Number(e.target.value))}
+                    />
+                  </div>
                 </>
               ) : (
                 <div className="setting-item">
@@ -301,6 +331,20 @@ export const Settings: React.FC<SettingsProps> = ({
                   step="0.1"
                   value={config.intrinsicGradientPunishmentMax}
                   onChange={(e) => handleChange('intrinsicGradientPunishmentMax', Number(e.target.value))}
+                />
+              </div>
+              <div className="setting-item">
+                <label>
+                  Intrinsic Buffer Size
+                  <span className="value-display">{config.intrinsicBufferSize} states</span>
+                </label>
+                <input
+                  type="range"
+                  min="10"
+                  max="300"
+                  step="10"
+                  value={config.intrinsicBufferSize}
+                  onChange={(e) => handleChange('intrinsicBufferSize', Number(e.target.value))}
                 />
               </div>
             </>

@@ -7,7 +7,6 @@ export class RewardManager {
   private intrinsicPunishmentTimer: ReturnType<typeof setTimeout> | null = null;
   private config: AppConfig;
   private onLearningEvent: (event: LearningEvent) => void;
-  private maxBufferSize: number = 80;
 
   constructor(
     config: AppConfig,
@@ -26,8 +25,14 @@ export class RewardManager {
   addState(state: AgentState): void {
     this.stateBuffer.push({ ...state });
     
-    // Enforce max buffer size
-    if (this.stateBuffer.length > this.maxBufferSize) {
+    // Enforce max buffer size based on the largest configured buffer size
+    const maxBufferSize = Math.max(
+      this.config.rewardBufferSize,
+      this.config.punishmentBufferSize,
+      this.config.intrinsicBufferSize
+    );
+    
+    if (this.stateBuffer.length > maxBufferSize) {
       this.stateBuffer.shift(); // Remove oldest state
     }
   }
@@ -41,8 +46,10 @@ export class RewardManager {
     let learningEvent: LearningEvent;
 
     if (this.config.gradientReward) {
-      // Use all buffered states with gradient rewards
-      states = [...this.stateBuffer];
+      // Use buffered states limited by reward buffer size
+      const bufferSize = Math.min(this.config.rewardBufferSize, this.stateBuffer.length);
+      states = this.stateBuffer.slice(-bufferSize); // Take last N states
+      
       const gradientRewards = generateGradientRewards(
         states.length,
         this.config.rewardMin,
@@ -83,9 +90,11 @@ export class RewardManager {
     let states: AgentState[];
     let learningEvent: LearningEvent;
 
-    if (this.config.gradientReward) {
-      // Use all buffered states with gradient punishments (negative rewards)
-      states = [...this.stateBuffer];
+    if (this.config.gradientPunishment) {
+      // Use buffered states limited by punishment buffer size
+      const bufferSize = Math.min(this.config.punishmentBufferSize, this.stateBuffer.length);
+      states = this.stateBuffer.slice(-bufferSize); // Take last N states
+      
       const gradientRewards = generateGradientRewards(
         states.length,
         -this.config.gradientPunishmentMax,
@@ -148,7 +157,10 @@ export class RewardManager {
     }
 
     // Intrinsic punishment is always in gradient mode with neutral (0) gradient
-    const states = [...this.stateBuffer];
+    // Use buffered states limited by intrinsic buffer size
+    const bufferSize = Math.min(this.config.intrinsicBufferSize, this.stateBuffer.length);
+    const states = this.stateBuffer.slice(-bufferSize); // Take last N states
+    
     // Generate neutral gradient (all zeros) - exponential doesn't matter for zeros
     const neutralRewards = new Array(states.length).fill(0);
 

@@ -47,11 +47,14 @@ export interface AppConfig {
   rewardAmount: number; // Fixed reward amount when gradient is disabled
   rewardMin: number;
   rewardMax: number;
+  rewardBufferSize: number; // Buffer size for reward gradients
   manualPunishmentEnabled: boolean;
   gradientPunishment: boolean; // Gradient toggle for manual punishment
   punishmentAmount: number; // Fixed punishment amount when gradient is disabled
   gradientPunishmentMin: number;
   gradientPunishmentMax: number;
+  punishmentBufferSize: number; // Buffer size for punishment gradients
+  intrinsicBufferSize: number; // Buffer size for intrinsic punishment gradients
   canvasWidth: number;
   canvasHeight: number;
   networkArchitecture: NetworkArchitecture;
@@ -73,11 +76,14 @@ export const DEFAULT_CONFIG: AppConfig = {
   rewardAmount: 1,
   rewardMin: 0,
   rewardMax: 1,
+  rewardBufferSize: 100, // Default buffer size for reward gradients
   manualPunishmentEnabled: false,
   gradientPunishment: false,
   punishmentAmount: 1,
   gradientPunishmentMin: 0,
   gradientPunishmentMax: 1,
+  punishmentBufferSize: 100, // Default buffer size for punishment gradients
+  intrinsicBufferSize: 100, // Default buffer size for intrinsic punishment gradients
   canvasWidth: 800,
   canvasHeight: 600,
   networkArchitecture: 'simple-mlp',
