@@ -78,17 +78,31 @@ export class Agent {
     const rotationAmount = this.angularVelocity * deltaTime * 60; // Normalize to 60fps
     this.heading = normalizeAngle(this.heading + rotationAmount);
     
-    // Apply forward movement with momentum
+    // Apply forward movement - allow true zero speed
     const targetVelocity = output.forwardSpeed * this.maxSpeed;
-    const velocityDamping = 0.9;
-    this.velocity = this.velocity * velocityDamping + targetVelocity * (1 - velocityDamping);
     
-    // Update position based on heading and velocity
-    const deltaX = Math.cos(this.heading) * this.velocity * deltaTime * 60;
-    const deltaY = Math.sin(this.heading) * this.velocity * deltaTime * 60;
+    // If target speed is very low, stop immediately to allow standing still
+    if (targetVelocity < 0.01) {
+      this.velocity = 0;
+    } else {
+      // Use less damping for more responsive speed changes
+      const velocityDamping = 0.7; // Reduced from 0.9
+      this.velocity = this.velocity * velocityDamping + targetVelocity * (1 - velocityDamping);
+      
+      // Minimum velocity threshold to avoid very slow drifting
+      if (this.velocity < 0.005) {
+        this.velocity = 0;
+      }
+    }
     
-    this.position.x += deltaX;
-    this.position.y += deltaY;
+    // Update position only if velocity is above zero
+    if (this.velocity > 0) {
+      const deltaX = Math.cos(this.heading) * this.velocity * deltaTime * 60;
+      const deltaY = Math.sin(this.heading) * this.velocity * deltaTime * 60;
+      
+      this.position.x += deltaX;
+      this.position.y += deltaY;
+    }
   }
 
   constrainToCanvas(canvasWidth: number, canvasHeight: number): void {
@@ -112,41 +126,56 @@ export class Agent {
     // Enable anti-aliasing
     ctx.imageSmoothingEnabled = true;
     
+    // Change agent appearance based on speed
+    const speedRatio = this.velocity / this.maxSpeed;
+    const agentColor = speedRatio < 0.01 ? '#FF5722' : this.color; // Red when stopped
+    const agentSize = this.size + (speedRatio * 3); // Slightly larger when moving fast
+    
     // Draw agent body (circle) with smooth edges
-    ctx.fillStyle = this.color;
+    ctx.fillStyle = agentColor;
     ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = speedRatio < 0.01 ? 2 : 1; // Thicker border when stopped
     ctx.beginPath();
-    ctx.arc(0, 0, this.size, 0, 2 * Math.PI);
+    ctx.arc(0, 0, agentSize, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
     
     // Draw direction indicator (small triangle pointing forward)
     ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = this.color;
+    ctx.strokeStyle = agentColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(this.size * 0.7, 0);
-    ctx.lineTo(this.size * 0.3, -this.size * 0.3);
-    ctx.lineTo(this.size * 0.3, this.size * 0.3);
+    ctx.moveTo(agentSize * 0.7, 0);
+    ctx.lineTo(agentSize * 0.3, -agentSize * 0.3);
+    ctx.lineTo(agentSize * 0.3, agentSize * 0.3);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
     
-    // Draw velocity indicator (trail) with alpha blending
-    if (this.velocity > 0.1) {
-      const trailLength = Math.min(this.velocity * 15, 30);
+    // Draw velocity indicator (trail) with more responsive feedback
+    if (this.velocity > 0.005) { // Lower threshold to show more speed variations
+      const trailLength = Math.min(this.velocity * 200, 50); // More pronounced trail
+      const trailOpacity = Math.min(speedRatio * 2, 1); // More visible for higher speeds
+      
       const gradient = ctx.createLinearGradient(0, 0, -trailLength, 0);
-      gradient.addColorStop(0, this.color + '80'); // Semi-transparent
-      gradient.addColorStop(1, this.color + '00'); // Fully transparent
+      gradient.addColorStop(0, agentColor + Math.floor(trailOpacity * 128).toString(16).padStart(2, '0'));
+      gradient.addColorStop(1, agentColor + '00'); // Fully transparent
       
       ctx.strokeStyle = gradient;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2 + speedRatio * 3; // Thicker trail for higher speeds
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(-this.size * 0.5, 0);
+      ctx.moveTo(-agentSize * 0.5, 0);
       ctx.lineTo(-trailLength, 0);
       ctx.stroke();
+    }
+    
+    // Draw speed indicator text when stopped
+    if (speedRatio < 0.01) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '8px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('STOP', 0, agentSize + 15);
     }
     
     ctx.restore();

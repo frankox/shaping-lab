@@ -205,10 +205,17 @@ export class NeuralNetworkWrapper {
       const currentExplorationRate = this.explorationRate * Math.pow(decayRate, this.step);
       
       if (Math.random() < currentExplorationRate) {
-        // Add exploration noise
-        rotationDirection += (Math.random() - 0.5) * 0.4;
-        rotationSpeed = Math.random() * 0.8; // More varied rotation
-        forwardSpeed = Math.random() * 0.6; // More varied speed
+        // Add exploration noise - but preserve low speeds for standing still
+        if (forwardSpeed > 0.1) { // Only add noise if speed is not very low
+          rotationDirection += (Math.random() - 0.5) * 0.4;
+          rotationSpeed = Math.random() * 0.8; // More varied rotation
+          forwardSpeed = Math.random() * 0.6; // More varied speed
+        } else {
+          // For low speeds, add minimal noise to allow standing still
+          rotationDirection += (Math.random() - 0.5) * 0.2;
+          rotationSpeed += (Math.random() - 0.5) * 0.1;
+          forwardSpeed += (Math.random() - 0.5) * 0.05;
+        }
       }
 
       const result = {
