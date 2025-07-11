@@ -514,11 +514,19 @@ export class NeuralNetworkWrapper {
     this.sequenceBuffer = []; // Reset sequence buffer for LSTM
   }
 
-  switchArchitecture(newArchitecture: NetworkArchitecture): void {
-    if (newArchitecture !== this.architecture) {
-      this.architecture = newArchitecture;
-      this.resetModel();
-    }
+  switchArchitecture(newArchitecture: NetworkArchitecture): Promise<void> {
+    return new Promise((resolve) => {
+      if (newArchitecture !== this.architecture) {
+        // Use setTimeout to allow UI to update before heavy computation
+        setTimeout(() => {
+          this.architecture = newArchitecture;
+          this.resetModel();
+          resolve();
+        }, 10);
+      } else {
+        resolve();
+      }
+    });
   }
 
   getCurrentArchitecture(): NetworkArchitecture {

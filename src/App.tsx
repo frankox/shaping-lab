@@ -19,6 +19,7 @@ const App = () => {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
+  const [isLoadingNetwork, setIsLoadingNetwork] = useState(false);
   const [stateBufferSize, setStateBufferSize] = useState(0);
   const [timeSinceLastLearning, setTimeSinceLastLearning] = useState(0);
   const [rewardFeedback, setRewardFeedback] = useState<{
@@ -35,6 +36,8 @@ const App = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        setIsLoadingNetwork(true);
+        
         // Clear any existing canvas elements
         if (canvasContainerRef.current) {
           canvasContainerRef.current.innerHTML = '';
@@ -64,6 +67,8 @@ const App = () => {
         startSimulation();
       } catch (error) {
         console.error('Failed to initialize app:', error);
+      } finally {
+        setIsLoadingNetwork(false);
       }
     };
 
@@ -212,7 +217,10 @@ const App = () => {
 
     // Handle network architecture changes
     if (neuralNetworkRef.current && neuralNetworkRef.current.getCurrentArchitecture() !== config.networkArchitecture) {
-      neuralNetworkRef.current.switchArchitecture(config.networkArchitecture);
+      setIsLoadingNetwork(true);
+      neuralNetworkRef.current.switchArchitecture(config.networkArchitecture).finally(() => {
+        setIsLoadingNetwork(false);
+      });
     }
   }, [config]);
 
@@ -277,6 +285,18 @@ const App = () => {
 
   return (
     <div className="app">
+      {/* Loading overlay for network architecture changes */}
+      {isLoadingNetwork && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <div className="loading-spinner"></div>
+            <h3>Initializing Neural Network</h3>
+            <p>Setting up the {config.networkArchitecture.replace('-', ' ').toUpperCase()} architecture...</p>
+            <p className="loading-subtitle">This may take a moment while we create the network layers and initialize weights.</p>
+          </div>
+        </div>
+      )}
+
       <div className={`main-content ${isSettingsOpen ? 'sidebar-open' : ''}`}>
         <div className="canvas-container" ref={canvasContainerRef}>
           {/* Canvas will be inserted here */}
@@ -293,13 +313,13 @@ const App = () => {
           }}>
             <div>States buffered: {stateBufferSize}</div>
             <div>Time since learning: {Math.round(timeSinceLastLearning)}s</div>
-            <div>Status: {isTraining ? 'Training...' : 'Active'}</div>
+            <div>Status: {isLoadingNetwork ? 'Loading Network...' : isTraining ? 'Training...' : 'Active'}</div>
           </div>
           
           <button
             className="reward-btn"
             onClick={handleReward}
-            disabled={isSettingsOpen}
+            disabled={isSettingsOpen || isLoadingNetwork}
           >
             Reward
           </button>
@@ -308,7 +328,7 @@ const App = () => {
             <button
               className="punish-btn"
               onClick={handlePunishment}
-              disabled={isSettingsOpen}
+              disabled={isSettingsOpen || isLoadingNetwork}
             >
               Punish
             </button>
@@ -317,7 +337,7 @@ const App = () => {
           <button
             className="pause-btn"
             onClick={togglePause}
-            disabled={isSettingsOpen}
+            disabled={isSettingsOpen || isLoadingNetwork}
           >
             {isPaused ? 'Resume' : 'Pause'}
           </button>
@@ -325,7 +345,7 @@ const App = () => {
           <button
             className="reset-btn"
             onClick={handleReset}
-            disabled={isSettingsOpen}
+            disabled={isSettingsOpen || isLoadingNetwork}
           >
             Reset
           </button>
@@ -333,6 +353,7 @@ const App = () => {
           <button
             className="settings-btn"
             onClick={toggleSettings}
+            disabled={isLoadingNetwork}
           >
             Settings
           </button>
@@ -344,6 +365,7 @@ const App = () => {
         style={{ position: 'absolute', top: 16, left: 16, zIndex: 10 }}
         onClick={() => setIsAboutOpen(true)}
         aria-label="About Shaping Lab"
+        disabled={isLoadingNetwork}
       >
         About
       </button>
