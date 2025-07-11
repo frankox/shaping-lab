@@ -54,6 +54,7 @@ export const Settings: React.FC<SettingsProps> = ({
               <option value="simple-mlp">Simple MLP</option>
               <option value="residual-mlp">Residual MLP</option>
               <option value="recurrent-lstm">Recurrent LSTM</option>
+              <option value="recurrent-gru">Recurrent GRU</option>
             </select>
             
             <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
@@ -76,6 +77,13 @@ export const Settings: React.FC<SettingsProps> = ({
                   <strong>Recurrent LSTM:</strong> A memory-based network that remembers past actions 
                   and states. Excellent for learning sequences and temporal patterns. Can develop 
                   strategies that depend on recent history.
+                </div>
+              )}
+              {config.networkArchitecture === 'recurrent-gru' && (
+                <div>
+                  <strong>Recurrent GRU:</strong> A simplified memory-based network similar to LSTM 
+                  but with fewer parameters. Faster training than LSTM while still maintaining memory 
+                  of past states. Good balance between performance and computational efficiency.
                 </div>
               )}
             </div>

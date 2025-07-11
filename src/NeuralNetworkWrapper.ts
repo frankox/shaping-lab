@@ -30,6 +30,8 @@ export class NeuralNetworkWrapper {
         return this.createResidualMLP();
       case 'recurrent-lstm':
         return this.createLSTM();
+      case 'recurrent-gru':
+        return this.createGRU();
       default:
         return this.createSimpleMLP();
     }
@@ -147,6 +149,35 @@ export class NeuralNetworkWrapper {
     return model;
   }
 
+  private createGRU(): tf.Sequential {
+    const model = tf.sequential({
+      layers: [
+        tf.layers.gru({
+          units: 16,
+          inputShape: [this.maxSequenceLength, 7], // sequences of 7 features
+          returnSequences: false,
+        }),
+        tf.layers.dense({
+          units: 16,
+          activation: 'relu',
+          kernelInitializer: 'randomNormal',
+        }),
+        tf.layers.dense({
+          units: 3,
+          activation: 'tanh',
+          kernelInitializer: 'randomNormal',
+        }),
+      ],
+    });
+
+    model.compile({
+      optimizer: this.optimizer,
+      loss: 'meanSquaredError',
+    });
+
+    return model;
+  }
+
   private addToSequenceBuffer(input: number[]): void {
     this.sequenceBuffer.push(input);
     
@@ -184,6 +215,13 @@ export class NeuralNetworkWrapper {
         this.addToSequenceBuffer(inputArray);
         
         // Create sequence tensor for LSTM
+        const sequenceData = this.getSequenceInput();
+        inputTensor = tf.tensor3d([sequenceData]); // [batch, time, features]
+      } else if (this.architecture === 'recurrent-gru') {
+        // Add current input to sequence buffer
+        this.addToSequenceBuffer(inputArray);
+        
+        // Create sequence tensor for GRU
         const sequenceData = this.getSequenceInput();
         inputTensor = tf.tensor3d([sequenceData]); // [batch, time, features]
       } else {
@@ -287,6 +325,10 @@ export class NeuralNetworkWrapper {
             this.addToSequenceBuffer(inputArray);
             const sequenceData = this.getSequenceInput();
             inputTensor = tf.tensor3d([sequenceData]);
+          } else if (this.architecture === 'recurrent-gru') {
+            this.addToSequenceBuffer(inputArray);
+            const sequenceData = this.getSequenceInput();
+            inputTensor = tf.tensor3d([sequenceData]);
           } else {
             inputTensor = tf.tensor2d([inputArray]);
           }
@@ -354,8 +396,8 @@ export class NeuralNetworkWrapper {
       let inputTensor: tf.Tensor;
       let targetTensor: tf.Tensor;
 
-      if (this.architecture === 'recurrent-lstm') {
-        // For LSTM, we need to create sequences
+      if (this.architecture === 'recurrent-lstm' || this.architecture === 'recurrent-gru') {
+        // For LSTM and GRU, we need to create sequences
         const sequences: number[][][] = [];
         const sequenceTargets: number[][] = [];
         

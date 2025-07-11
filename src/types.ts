@@ -36,7 +36,7 @@ export interface LearningEvent {
   timestamp: number;
 }
 
-export type NetworkArchitecture = 'simple-mlp' | 'residual-mlp' | 'recurrent-lstm';
+export type NetworkArchitecture = 'simple-mlp' | 'residual-mlp' | 'recurrent-lstm' | 'recurrent-gru';
 
 export interface AppConfig {
   intrinsicPunishment: boolean;
